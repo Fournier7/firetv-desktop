@@ -9,6 +9,7 @@ from firetv.config import AppConfig
 from firetv.connection import Connection
 from firetv.keys import KeyCode
 from firetv.text import prepare_text
+from firetv.volume import NONE, normalize_method, volume_command
 
 _FOCUS_RE = re.compile(r"mCurrentFocus=.*?([A-Za-z0-9_.]+)/[A-Za-z0-9_.$]+\}")
 _PACKAGE_RE = re.compile(r"[A-Za-z0-9._]+")
@@ -40,10 +41,13 @@ class Controller:
             self.conn.shell(f"input text '{ready}'")
         return SendTextResult(sent=sent if ready else 0, skipped=skipped)
 
-    def volume(self, key: KeyCode) -> bool:
+    def volume(self, key: KeyCode, method: str = "") -> bool:
         if key not in _VOLUME_KEYS:
             raise ValueError(f"{key!r} não é uma tecla de volume")
-        output = self.conn.shell(f"input keyevent {int(key)}").lower()
+        method = normalize_method(method)
+        if method == NONE:
+            return False
+        output = self.conn.shell(volume_command(method, key)).lower()
         return "error" not in output and "exception" not in output
 
     def list_apps(self, cfg: AppConfig, show_hidden: bool = False) -> list[AppEntry]:

@@ -62,3 +62,29 @@ def test_volume_false_on_exception_output_any_case(ctl, conn):
 def test_volume_rejects_non_volume_key(ctl):
     with pytest.raises(ValueError):
         ctl.volume(KeyCode.UP)
+
+
+def test_controller_volume_uses_method(ctl, conn):
+    assert ctl.volume(KeyCode.VOLUME_UP, "media_session") is True
+    assert conn.commands == ["cmd media_session volume --show --adj raise"]
+
+
+def test_controller_volume_none_sends_nothing_and_returns_false(ctl, conn):
+    assert ctl.volume(KeyCode.VOLUME_UP, "none") is False
+    assert conn.commands == []
+
+
+def test_controller_volume_empty_or_unknown_method_falls_back_to_keyevent(ctl, conn):
+    ctl.volume(KeyCode.VOLUME_DOWN, "")
+    ctl.volume(KeyCode.MUTE, "metodo_inexistente")
+    assert conn.commands == ["input keyevent 25", "input keyevent 164"]
+
+
+def test_controller_volume_error_output_still_false_with_other_method(ctl, conn):
+    conn.responses["input keyboard keyevent 24"] = "Exception occurred"
+    assert ctl.volume(KeyCode.VOLUME_UP, "keyboard") is False
+
+
+def test_controller_volume_still_rejects_non_volume_key_with_method(ctl):
+    with pytest.raises(ValueError):
+        ctl.volume(KeyCode.UP, "keyboard")
