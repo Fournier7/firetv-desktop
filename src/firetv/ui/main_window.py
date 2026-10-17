@@ -5,6 +5,7 @@ from PySide6.QtWidgets import QLabel, QMainWindow, QTabWidget
 
 from firetv.config import AppConfig
 from firetv.session import Session
+from firetv.ui.remote_tab import RemoteTab
 from firetv.ui.settings_tab import SettingsTab
 
 
@@ -21,7 +22,7 @@ class MainWindow(QMainWindow):
         self.resize(440, 760)
         self.tabs = QTabWidget()
         self.tabs.addTab(_placeholder("Início: em breve"), "Início")
-        self.tabs.addTab(_placeholder("Controle: em breve"), "Controle")
+        self.tabs.addTab(RemoteTab(session), "Controle")
         self.tabs.addTab(_placeholder("Apps: em breve"), "Apps")
         self.tabs.addTab(SettingsTab(session, cfg), "Ajustes")
         self.setCentralWidget(self.tabs)
