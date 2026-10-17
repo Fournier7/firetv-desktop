@@ -5,3 +5,7 @@ dist/
 build/
 *.spec
 .venv/
+.superpowers/
+.idea/
+.vscode/
+*.log

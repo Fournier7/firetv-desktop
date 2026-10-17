@@ -1,96 +1,114 @@
 # Fire TV Desktop
 
-Aplicativo de desktop para **Windows** que controla um **Fire TV Stick** pela rede local, via ADB.
-Feito em Python (PySide6), com a lógica separada da interface e testada sem precisar da TV.
+**Controle o seu Fire TV Stick pelo PC.** App de bandeja para Windows, feito em Python com PySide6, que fala com o Stick por ADB na rede local: controle remoto, teclado, grade de apps, favoritos e histórico de uso.
 
-![Controle](docs/screenshots/controle.png) ![Apps](docs/screenshots/apps.png)
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)
+![PySide6](https://img.shields.io/badge/UI-PySide6-41CD52)
+![Windows](https://img.shields.io/badge/plataforma-Windows-0078D6)
+![MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-green)
 
-## O que faz
+<p align="center">
+  <img src="docs/screenshots/home.png" width="230" alt="Tela Início">
+  <img src="docs/screenshots/remote.png" width="230" alt="Tela Controle">
+  <img src="docs/screenshots/apps.png" width="230" alt="Tela Apps">
+</p>
+<p align="center">
+  <img src="docs/screenshots/activity.png" width="230" alt="Tela Atividade">
+  <img src="docs/screenshots/settings.png" width="230" alt="Tela Ajustes">
+</p>
 
-O app vive na **bandeja do sistema** (perto do relógio). Clique no ícone para abrir o painel, e clique fora
-para fechá-lo. Para encerrar de verdade, use o botão direito no ícone e escolha **Sair**.
-Ao abrir, ele conecta sozinho ao IP salvo.
+## Por que existe
 
-![Início](docs/screenshots/home.png) ![Controle](docs/screenshots/remote.png) ![Apps](docs/screenshots/apps.png)
+Já existem apps de celular para controlar a Fire TV, mas não uma versão leve para o computador. Este projeto leva essa ideia para a bandeja do Windows: um clique no ícone abre o painel, e você controla a TV sem pegar o controle remoto nem o celular.
 
-- **Início:** o app em execução na TV, volume e os 4 primeiros favoritos. A cor de destaque do painel muda
-  conforme o app (vermelho no YouTube e Netflix, azul no Prime Video).
-- **Controle:** direcional circular, Início, Voltar, Menu, mídia e teclado. Atalhos: setas, Enter (OK) e Esc (Voltar),
-  que não disparam enquanto você digita em um campo de texto. O Android só aceita ASCII simples ao digitar:
-  acentos e `%` são ignorados e o app avisa quais.
-- **Apps:** por padrão mostra só os apps famosos (Netflix, Prime Video, YouTube, Disney+, HBO Max, Spotify,
-  Apple TV, Paramount+ e outros) e os que você mesmo instalou, escondendo os pacotes do sistema. Marque
-  **Mostrar todos os apps** para ver o resto. Tem busca, favoritos (estrela), esconder/mostrar app
-  (botão direito) e o rótulo NA TELA no app que está aberto. Se um app famoso não aparecer, ele pode usar
-  outro nome de pacote: me avise qual é (aparece em Mostrar todos os apps).
-- **Atividade:** tempo por app em primeiro plano no Stick, em Hoje, 7 dias e 30 dias. O histórico é guardado
-  só no seu PC (`activity.json`) e começa a contar a partir do primeiro uso. O Stick não informa se a TV está
-  desligada, então o tempo pode incluir períodos com a TV apagada.
-- **Ajustes:** nome da TV, IP do Stick, conectar e o **Diagnóstico de volume**.
+## Funcionalidades
 
-### Volume
+- **Painel na bandeja do sistema:** abre com um clique no ícone, fecha ao clicar fora, e conecta sozinho ao Stick ao iniciar.
+- **Início:** o app em execução na TV, botões de volume e os favoritos. A cor de destaque do painel muda conforme o app (vermelho no YouTube e na Netflix, azul no Prime Video).
+- **Controle:** direcional circular, Início, Voltar, Menu, retroceder, play/pause e avançar. Atalhos de teclado (setas, Enter e Esc) que não disparam enquanto você digita.
+- **Digitação no PC:** escreva no teclado do computador e envie para o campo de texto aberto na TV.
+- **Apps:** apps famosos (Netflix, Prime Video, YouTube, Disney+, HBO Max, Spotify, Apple TV, Paramount+ e outros) e os que você instalou, com busca, favoritos e opção de esconder. Os pacotes do sistema ficam fora da lista, a menos que você peça para ver todos.
+- **Atividade:** tempo por app em primeiro plano (hoje, 7 e 30 dias), guardado só no seu PC.
+- **Ajustes:** nome da TV, IP do Stick e um diagnóstico de volume que descobre qual comando funciona na sua TV.
+- **Reconexão automática** com espera crescente (1, 2 e 4 segundos) se a conexão cair.
 
-Em um Stick, o volume depende de como o controle físico fala com a TV (HDMI-CEC ou infravermelho).
-O **Diagnóstico de volume** (em Ajustes) testa 4 jeitos de mandar "volume +" e pergunta qual mexeu na TV;
-o app passa a usar o escolhido. Se nenhum funcionar, o volume parece depender do infravermelho do controle
-físico, que o PC não consegue reproduzir, e os botões de volume somem.
+## Como usar
 
-Fora do escopo: entrada HDMI, ajustes de imagem, transmitir arquivo, cursor da TV, botão de ligar,
-logos oficiais dos apps e conexão sem ADB.
-
-## Configurar o Stick (uma vez)
+### 1. Preparar o Stick (uma vez)
 
 1. No Stick: **Configurações > Meu Fire TV > Opções do desenvolvedor > Depuração ADB** (ligada).
    Se "Opções do desenvolvedor" não aparecer, abra **Sobre** e clique várias vezes em **Fire TV Stick** até ativar.
-2. Anote o IP do Stick (**Configurações > Meu Fire TV > Sobre > Rede**).
-   O ideal é reservar um IP fixo para ele no roteador, porque o ADB não se anuncia na rede.
-3. Na primeira conexão, a TV mostra um pedido de autorização. Aceite (e marque "sempre permitir").
+2. Anote o IP do Stick em **Configurações > Meu Fire TV > Sobre > Rede**. O ideal é reservar um IP fixo para ele no roteador, porque o ADB não se anuncia na rede.
+3. Na primeira conexão, a TV mostra um pedido de autorização: aceite e marque "sempre permitir".
 
-## Rede
+### 2. Obter o app
 
-O PC e o Stick precisam estar na **mesma rede local**, atrás do mesmo roteador.
-PC no cabo e Stick no wifi funcionam. **Rede de convidados** ou **isolamento de clientes (AP isolation)**
-costumam bloquear a conexão: se não conectar, confira isso no roteador.
+- **Mais fácil (Windows):** instale o Python 3.10 ou mais novo (marque *Add python.exe to PATH*) e dê dois cliques em `build_exe.bat`. Ele cria o ambiente, instala as dependências e gera `dist\FireTVDesktop.exe`, um arquivo único.
+- **Sem instalar Python:** no GitHub, abra a aba **Actions**, escolha **Build Windows** e clique em **Run workflow** (ou envie uma tag `v*`). O workflow roda os testes e deixa o `.exe` para baixar como artefato.
+- **Pelo código:** veja [Desenvolvimento](#desenvolvimento).
 
-## Instalar e rodar (desenvolvimento)
+### 3. Conectar
 
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install -e ".[dev]"
-python -m firetv.main
-```
+Abra o app. Na primeira vez ele abre em **Ajustes**: digite o IP do Stick e clique em **Conectar**. Nas próximas, ele conecta sozinho.
 
-## Testes
+> **Rede:** o PC e o Stick precisam estar atrás do mesmo roteador. PC no cabo e Stick no wifi funcionam. **Rede de convidados** ou **isolamento de clientes (AP isolation)** costumam bloquear a conexão: se não conectar, confira isso no roteador.
 
-```bash
-pytest
-```
+## Limitações conhecidas
 
-Os testes usam uma conexão falsa (`tests/fakes.py`): nenhum teste usa rede de verdade.
-
-## Gerar o executável (Windows)
-
-**Mais fácil:** instale o Python 3.10 ou mais novo (marque "Add python.exe to PATH") e dê dois cliques em
-`build_exe.bat`. Ele cria o ambiente, instala as dependências e gera **`dist\FireTVDesktop.exe`**, um arquivo
-único que você pode copiar para onde quiser (não precisa instalar nada para abrir).
-
-Para conferir que o executável sobe e que a chave ADB funciona, rode no terminal
-`start /wait "" dist\FireTVDesktop.exe --selftest` seguido de `echo %errorlevel%`: deve mostrar `0`.
-
-**Sem instalar Python:** o workflow `.github/workflows/build-windows.yml` gera o `.exe` no GitHub
-(aba Actions > Build Windows > Run workflow) e deixa o arquivo para baixar.
-
-Comando manual equivalente: `pyinstaller --noconfirm --onefile --noconsole --name FireTVDesktop --paths src app.py`.
+- **Volume:** em um Stick, o volume do controle físico usa HDMI-CEC ou infravermelho. Se for infravermelho, o sinal sai do controle e o PC não consegue reproduzi-lo. O diagnóstico em Ajustes testa quatro comandos; se nenhum funcionar, o app esconde os botões. O Stick também não informa o nível de volume.
+- **Atividade:** o Stick não informa se a TV está desligada, então o tempo pode incluir períodos com a TV apagada.
+- **Nomes de apps:** a tabela de apps famosos usa nomes de pacote do Fire TV levantados em fontes públicas. Um app fora da tabela aparece pelo nome do pacote (veja *Mostrar todos os apps*). Abrir uma issue com o nome do pacote basta para acrescentá-lo.
+- **Fora do escopo:** entrada HDMI, ajustes de imagem, espelhamento de tela, botão de ligar e logos oficiais dos apps.
 
 ## Arquitetura
 
-Três camadas: **interface** (`firetv/ui`: `panel.py`, abas, componentes e tema), **controle**
-(`controller.py`, `session.py`, `apps.py`, `activity.py`, `volume.py`, `config.py`) e **conexão ADB**
-(`connection.py`, a única que fala com o Stick). A interface não conhece ADB; trocar a conexão por outra
-implementação não mexe no resto. A lógica é testada com uma conexão falsa (`tests/fakes.py`).
+Três camadas, com uma regra: a interface nunca fala com o ADB.
 
-## Roteiro de teste manual (no Windows, com o Stick real)
+```
+ interface (PySide6)         painel, abas, componentes, tema
+        │  chama
+ controle (Python puro)      Controller · Session · apps · activity · volume · config
+        │  usa a interface Connection
+ conexão (adb-shell)         AdbConnection  ←→  FakeConnection (testes)
+```
+
+Decisões que valem destacar:
+
+- **Conexão injetável.** `Connection` é um protocolo; a implementação real usa `adb-shell` e os testes usam uma `FakeConnection`. Nenhum teste usa rede de verdade, e trocar o ADB por outro jeito de falar com o Stick não mexe no resto.
+- **Testes primeiro (TDD).** A lógica e a interface têm mais de 290 testes (`pytest` e `pytest-qt`), escritos antes do código. Cada tarefa do projeto virou um commit.
+- **Concorrência segura.** Os comandos rodam fora da thread da interface (`QThreadPool`) e passam por um lock na `Session`, porque uma conexão ADB só aceita um comando por vez.
+- **Erros que o usuário entende.** Falha de rede, autorização pendente e conexão perdida viram mensagens em português com o que fazer, nunca texto técnico cru.
+- **Entradas que não confiam em ninguém.** O nome do pacote é validado antes de entrar num comando de shell, e o texto digitado é escapado; arquivos de configuração e de atividade corrompidos viram `.bak` e o app abre mesmo assim.
+- **Dados só no PC.** Configuração, histórico de atividade e a chave ADB ficam em `%APPDATA%\firetv-desktop`.
+
+```
+src/firetv/
+  connection.py   erros, protocolo Connection, AdbConnection
+  session.py      estado da conexão e reconexão
+  controller.py   teclas, texto, volume, apps, app em execução
+  apps.py         tabela de apps conhecidos, busca, favoritos
+  activity.py     registro de atividade
+  volume.py       métodos de volume
+  config.py       configuração local
+  ui/             painel, abas, componentes, tema e ícones
+tests/            testes e FakeConnection
+docs/planos/      especificação e planos de implementação de cada versão
+```
+
+## Desenvolvimento
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate          # no Linux/macOS: source .venv/bin/activate
+pip install -e ".[dev]"
+python -m firetv.main           # abre o app
+pytest                          # roda os testes
+```
+
+Para conferir um executável gerado: `start /wait "" dist\FireTVDesktop.exe --selftest` seguido de `echo %errorlevel%` deve mostrar `0`.
+
+<details>
+<summary>Roteiro de teste manual (no Windows, com o Stick real)</summary>
 
 Com o PC no cabo e o Stick no wifi:
 
@@ -106,10 +124,15 @@ Com o PC no cabo e o Stick no wifi:
 - [ ] desligar o Stick e ligar de novo: o rodapé mostra Reconectando e volta
 - [ ] fontes e tamanho ficam legíveis no seu monitor
 
-Pontos a conferir no Stick real (os comandos foram escritos sem acesso a um aparelho):
-`pm list packages` lista os apps de streaming? Os pacotes da tabela em `apps.py` estão certos?
-`dumpsys window | grep mCurrentFocus` devolve o app aberto?
+</details>
+
+## Próximos passos
+
+- Conectar a mais de um Stick e trocar entre eles.
+- Iniciar junto com o Windows.
+- Mostrar o quadro de TV grande na tela Início.
+- Publicar o `.exe` como Release no GitHub.
 
 ## Licença
 
-MIT.
+[MIT](LICENSE) © 2026 Willian Fournier Pereira

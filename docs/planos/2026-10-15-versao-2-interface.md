@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3, PySide6 (inclui QtSvg), pytest, pytest-qt, PyInstaller.
 
-**Spec:** Especificação: Nova interface do Fire TV Desktop (v2), https://claude.ai/code/artifact/b86723b1-c46d-4d63-9dab-fb35c49e1f8f (documento na conversa; não há cópia no repositório)
+**Spec:** escrita e aprovada em conversa durante o projeto (documento não publicado).
 
 ## Global Constraints
 
