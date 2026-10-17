@@ -4,7 +4,8 @@ from PySide6.QtCore import Qt
 from fakes import FakeConnection
 from firetv.config import AppConfig, load_config
 from firetv.session import Session
-from firetv.ui.apps_tab import AppsTab
+from firetv.apps import AppEntry
+from firetv.ui.apps_tab import AppsTab, AppTile
 
 PM = "pm list packages"
 PACKAGES = "package:com.netflix.ninja\npackage:x.y.z\npackage:a.b.c\n"
@@ -52,11 +53,12 @@ def test_star_click_toggles_favorite_and_saves_config(qtbot, env):
     cfg = AppConfig()
     tab = make_tab(qtbot, session, cfg, expected_tiles=3)
     netflix = next(t for t in tab.tiles() if t.name_label.text() == "Netflix")
+    assert not netflix.star_button.isChecked()
     netflix.star_button.click()
     assert cfg.favorites == ["com.netflix.ninja"]
     assert load_config().favorites == ["com.netflix.ninja"]
     netflix = next(t for t in tab.tiles() if t.name_label.text() == "Netflix")
-    assert netflix.star_button.text() == "★"
+    assert netflix.star_button.isChecked()
     netflix.star_button.click()
     assert cfg.favorites == []
 
@@ -118,3 +120,60 @@ def test_refreshes_when_session_connects(qtbot):
     tab.show()
     session.connect("192.168.0.10")
     qtbot.waitUntil(lambda: len(tab.tiles()) == 3, timeout=3000)
+
+
+NETFLIX = "com.netflix.ninja"
+
+
+def test_search_placeholder_shows_total_of_loaded_apps(qtbot, env):
+    _, session = env
+    tab = make_tab(qtbot, session, AppConfig(hidden=["x.y.z"]), expected_tiles=2)
+    assert tab.search_edit.placeholderText() == "Buscar nos 3 apps"  # conta os escondidos também
+
+
+def test_search_placeholder_without_apps(qtbot):
+    conn = FakeConnection()
+    session = Session(lambda: conn, sleep=lambda s: None)
+    tab = make_tab(qtbot, session, AppConfig())
+    assert tab.search_edit.placeholderText() == "Buscar apps"
+
+
+def test_set_current_app_marks_only_that_tile_on_screen(qtbot, env):
+    _, session = env
+    tab = make_tab(qtbot, session, AppConfig(), expected_tiles=3)
+    tab.set_current_app(NETFLIX)
+    flags = {t.entry.package: not t.badge_label.isHidden() for t in tab.tiles()}
+    assert flags == {NETFLIX: True, "x.y.z": False, "a.b.c": False}
+    assert next(t for t in tab.tiles() if t.entry.package == NETFLIX).badge_label.text() == "NA TELA"
+    tab.set_current_app(None)
+    assert all(t.badge_label.isHidden() for t in tab.tiles())
+
+
+def test_current_app_survives_a_re_render(qtbot, env):
+    _, session = env
+    tab = make_tab(qtbot, session, AppConfig(), expected_tiles=3)
+    tab.set_current_app(NETFLIX)
+    tab.search_edit.setText("netf")
+    [tile] = tab.tiles()
+    assert not tile.badge_label.isHidden()
+
+
+def test_tile_is_tinted_with_the_app_color(qtbot):
+    entry = AppEntry(package=NETFLIX, name="Netflix", color="#E50914", favorite=False, hidden=False)
+    tile = AppTile(entry)
+    qtbot.addWidget(tile)
+    assert "rgba(229, 9, 20" in tile.styleSheet()
+
+
+def test_tile_without_star(qtbot):
+    entry = AppEntry(package=NETFLIX, name="Netflix", color="#E50914", favorite=True, hidden=False)
+    tile = AppTile(entry, show_star=False)
+    qtbot.addWidget(tile)
+    assert tile.star_button is None
+
+
+def test_tile_star_reflects_favorite(qtbot):
+    entry = AppEntry(package=NETFLIX, name="Netflix", color="#E50914", favorite=True, hidden=False)
+    tile = AppTile(entry)
+    qtbot.addWidget(tile)
+    assert tile.star_button.isChecked() and tile.badge_label.isHidden()
