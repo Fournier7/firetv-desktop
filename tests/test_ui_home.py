@@ -143,3 +143,15 @@ def test_home_does_not_poll_while_never_connected(qtbot):
     assert not home.timer.isActive()
     qtbot.wait(100)
     assert conn.commands == []
+
+
+def test_see_all_sits_in_the_favorites_header_row(qtbot, env):
+    _, session = env
+    home = make_home(qtbot, session)
+    home.show()
+    qtbot.wait(50)
+    title = home.favorites_title_label
+    assert title.text() == "FAVORITOS"
+    # mesma linha, e "Ver todos" à direita do título
+    assert abs(home.see_all_button.geometry().center().y() - title.geometry().center().y()) < 12
+    assert home.see_all_button.geometry().left() > title.geometry().left()

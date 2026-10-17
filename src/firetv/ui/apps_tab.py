@@ -1,7 +1,8 @@
 """Aba Apps: grade de apps com busca, favoritos, esconder/mostrar e abrir."""
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import (
     QCheckBox,
     QFrame,
@@ -36,6 +37,26 @@ def initials(name: str) -> str:
     return "".join(t[0] for t in tokens[:2]).upper() or "?"
 
 
+class ElidedLabel(QLabel):
+    """Rótulo de uma linha que corta o texto com reticências; o texto completo fica na dica."""
+
+    def __init__(self, text: str) -> None:
+        super().__init__(text)
+        self.setToolTip(text)
+
+    def sizeHint(self) -> QSize:
+        return QSize(10, self.fontMetrics().height() + 2)
+
+    def minimumSizeHint(self) -> QSize:
+        return self.sizeHint()
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setPen(self.palette().color(self.foregroundRole()))
+        shown = self.fontMetrics().elidedText(self.text(), Qt.ElideMiddle, self.width())
+        painter.drawText(self.rect(), int(self.alignment()), shown)
+
+
 class AppTile(QFrame):
     """Tile na cor do app, com iniciais, nome, estrela e rótulo NA TELA (sem logos oficiais)."""
 
@@ -48,7 +69,7 @@ class AppTile(QFrame):
         self.entry = entry
         self.setObjectName("tile")
         self.setCursor(Qt.PointingHandCursor)
-        self.setFixedSize(*((76, 92) if compact else (108, 128)))
+        self.setFixedSize(*((76, 92) if compact else (100, 124)))
         self._apply_style(on_screen=False)
 
         self.badge_label = QLabel(ON_SCREEN)
@@ -81,11 +102,10 @@ class AppTile(QFrame):
         self.mark.setStyleSheet(
             f"background: {entry.color}; color: white; border-radius: 12px; font-weight: bold;"
         )
-        self.name_label = QLabel(entry.name)
+        self.name_label = ElidedLabel(entry.name)
         self.name_label.setAlignment(Qt.AlignCenter)
-        self.name_label.setWordWrap(True)
         self.name_label.setStyleSheet(
-            f"background: transparent; font-size: {'11px' if compact else '14px'};"
+            f"background: transparent; font-size: {'10px' if compact else '14px'};"
         )
 
         layout = QVBoxLayout(self)
@@ -143,9 +163,12 @@ class AppsTab(QWidget):
         self._grid_host = QWidget()
         self._grid = QGridLayout(self._grid_host)
         self._grid.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        self._grid.setContentsMargins(0, 0, 0, 0)
+        self._grid.setSpacing(8)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll.setWidget(self._grid_host)
 
         layout = QVBoxLayout(self)

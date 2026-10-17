@@ -82,9 +82,7 @@ class ActivityTab(QWidget):
         self.period_buttons["today"].setChecked(True)
 
         self.total_label = QLabel("0 s")
-        self.total_label.setStyleSheet(
-            f"font-size: 34px; font-weight: bold; color: {theme.DEFAULT_ACCENT};"
-        )
+        self.total_label.setObjectName("total")  # estilo (cor de destaque) vem do tema
         total_card = Card("Tempo na tela")
         total_card.body.addWidget(self.total_label)
 

@@ -107,13 +107,13 @@ def test_tab_buttons_switch_stack(qtbot, env):
     assert list(panel.tab_buttons) == list(tabs)
     for key, widget in tabs.items():
         panel.tab_buttons[key].click()
-        assert panel.stack.currentWidget() is widget
+        assert panel.current_page() is widget
         assert [k for k, b in panel.tab_buttons.items() if b.isChecked()] == [key]
 
 
 def test_starts_on_home_tab(qtbot, env):
     panel = make_panel(qtbot, env)
-    assert panel.stack.currentWidget() is panel.home_tab and panel.tab_buttons["home"].isChecked()
+    assert panel.current_page() is panel.home_tab and panel.tab_buttons["home"].isChecked()
 
 
 def test_accent_follows_polled_package_and_applies_only_on_change(qtbot, env):
@@ -203,13 +203,13 @@ def test_show_panel_places_it_inside_the_screen(qtbot, env):
 def test_show_tab(qtbot, env):
     panel = make_panel(qtbot, env)
     panel.show_tab("settings")
-    assert panel.stack.currentWidget() is panel.settings_tab and panel.tab_buttons["settings"].isChecked()
+    assert panel.current_page() is panel.settings_tab and panel.tab_buttons["settings"].isChecked()
 
 
 def test_see_all_opens_apps_tab(qtbot, env):
     panel = make_panel(qtbot, env)
     panel.home_tab.see_all_button.click()
-    assert panel.stack.currentWidget() is panel.apps_tab
+    assert panel.current_page() is panel.apps_tab
 
 
 def test_volume_method_changed_refreshes_audio_cards(qtbot, env):
@@ -304,4 +304,55 @@ def test_tray_quit_saves_and_quits(qtbot, env, monkeypatch, qapp):
     monkeypatch.setattr(qapp, "quit", lambda: quit_calls.append(1))
     tray.quit()
     assert log.saves == 1 and quit_calls == [1]
+    tray.tray.hide()
+
+
+def test_every_page_scrolls_vertically_and_never_horizontally(qtbot, env):
+    from PySide6.QtWidgets import QScrollArea
+
+    panel = make_panel(qtbot, env)
+    for i in range(panel.stack.count()):
+        area = panel.stack.widget(i)
+        assert isinstance(area, QScrollArea) and area.widgetResizable()
+        assert area.horizontalScrollBarPolicy() == Qt.ScrollBarAlwaysOff
+
+
+def test_remote_page_content_is_not_squeezed_into_the_panel(qtbot, env):
+    panel = make_panel(qtbot, env)
+    panel.show()
+    panel.show_tab("remote")
+    qtbot.wait(50)
+    # o direcional (200 px) precisa caber inteiro, sem sobrepor a linha de mídia
+    assert panel.remote_tab.dpad.height() == 200
+    assert panel.remote_tab.height() >= panel.remote_tab.minimumSizeHint().height()
+
+
+def test_real_deactivation_event_hides_the_panel(qtbot, env, qapp):
+    from PySide6.QtCore import QEvent
+
+    clock = Clock(100.0)
+    panel = make_panel(qtbot, env, clock)
+    panel.show_panel()
+    clock.now = 101.0
+    qapp.sendEvent(panel, QEvent(QEvent.ActivationChange))
+    qtbot.wait(20)
+    assert not panel.isVisible()
+
+
+def test_clicking_the_tray_icon_while_open_closes_instead_of_reopening(qtbot, env, monkeypatch, qapp):
+    """O clique no ícone tira o foco do painel (que se esconde) e só depois chega o clique da
+    bandeja: sem tratamento, o painel reabriria no mesmo instante."""
+    monkeypatch.setattr(QSystemTrayIcon, "isSystemTrayAvailable", staticmethod(lambda: True))
+    clock = Clock(100.0)
+    panel = make_panel(qtbot, env, clock)
+    tray = TrayController(qapp, panel)
+    panel.show_panel()
+    clock.now = 101.0
+    panel.hide_on_deactivate()          # foco perdido ao clicar no ícone
+    clock.now = 101.1
+    tray._on_activated(QSystemTrayIcon.Trigger)   # o clique chega logo depois
+    assert not panel.isVisible()
+    clock.now = 105.0                   # um clique de verdade, bem depois, abre
+    tray._on_activated(QSystemTrayIcon.Trigger)
+    assert panel.isVisible()
     tray.tray.hide()

@@ -10,8 +10,10 @@ from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
     QHBoxLayout,
+    QFrame,
     QLabel,
     QMenu,
+    QScrollArea,
     QStackedWidget,
     QSystemTrayIcon,
     QToolButton,
@@ -35,6 +37,7 @@ from firetv.ui.worker import get_bridge, run_in_background
 PANEL_SIZE = QSize(380, 560)
 MARGIN = 12
 SHOW_GUARD_SECONDS = 0.3  # ignora a perda de foco logo depois de abrir
+CLOSE_GUARD_SECONDS = 0.5  # um clique na bandeja logo após esconder por foco perdido fecha
 STATUS_TEXT = {
     ConnectionState.CONNECTED: "Conectada",
     ConnectionState.DISCONNECTED: "Desconectada",
@@ -79,6 +82,7 @@ class Panel(QWidget):
         self._log = log
         self._clock = clock
         self._shown_at = float("-inf")
+        self._hidden_by_focus_at = float("-inf")
         self.suppress_hide = False
         self.accent = theme.DEFAULT_ACCENT
         self.accent_changes = 0
@@ -121,7 +125,7 @@ class Panel(QWidget):
             group.addButton(button)
             self.tab_buttons[key] = button
             tabs_row.addWidget(button, 1)
-            self.stack.addWidget(page)
+            self.stack.addWidget(self._scrollable(page))
 
         # rodapé
         self.status_dot = QLabel("●")
@@ -144,6 +148,19 @@ class Panel(QWidget):
         self._show_state(session.state)
         self.show_tab("home")
         self._wire(session)
+
+    @staticmethod
+    def _scrollable(page: QWidget) -> QScrollArea:
+        """Cada aba rola na vertical quando não cabe (como a aba Controle do vídeo)."""
+        area = QScrollArea()
+        area.setWidgetResizable(True)
+        area.setFrameShape(QFrame.NoFrame)
+        area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        area.setWidget(page)
+        return area
+
+    def current_page(self) -> QWidget:
+        return self.stack.currentWidget().widget()
 
     # --- ligações entre as partes ---
     def _wire(self, session: Session) -> None:
@@ -212,7 +229,11 @@ class Panel(QWidget):
     def hide_on_deactivate(self) -> None:
         if self.suppress_hide or self._clock() - self._shown_at < SHOW_GUARD_SECONDS:
             return
+        self._hidden_by_focus_at = self._clock()
         self.hide()
+
+    def just_hidden_by_focus_loss(self) -> bool:
+        return self._clock() - self._hidden_by_focus_at < CLOSE_GUARD_SECONDS
 
     def changeEvent(self, event) -> None:
         super().changeEvent(event)
@@ -253,7 +274,7 @@ class TrayController:
     def toggle(self) -> None:
         if self._panel.isVisible():
             self._panel.hide()
-        else:
+        elif not self._panel.just_hidden_by_focus_loss():
             self._panel.show_panel()
 
     def _on_activated(self, reason) -> None:

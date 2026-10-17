@@ -38,8 +38,14 @@ class HomeTab(QWidget):
         self._strip = QHBoxLayout()
         self._strip.setSpacing(8)
 
-        favorites = Card("Favoritos")
-        favorites.body.addWidget(self.see_all_button)
+        self.favorites_title_label = QLabel("FAVORITOS")
+        self.favorites_title_label.setObjectName("help")
+        title_row = QHBoxLayout()
+        title_row.addWidget(self.favorites_title_label)
+        title_row.addStretch(1)
+        title_row.addWidget(self.see_all_button)
+        favorites = Card()
+        favorites.body.addLayout(title_row)
         favorites.body.addLayout(self._strip)
         favorites.body.addWidget(self.favorites_empty_label)
 

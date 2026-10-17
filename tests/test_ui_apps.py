@@ -186,3 +186,28 @@ def test_compact_tile_is_smaller(qtbot):
     qtbot.addWidget(compact)
     assert compact.width() < normal.width() and compact.height() < normal.height()
     assert compact.width() * 4 + 3 * 8 <= 340  # 4 tiles cabem na largura útil do painel
+
+
+def test_three_tiles_fit_in_the_panel_width(qtbot):
+    entry = AppEntry(package=NETFLIX, name="Netflix", color="#E50914", favorite=False, hidden=False)
+    tile = AppTile(entry)
+    qtbot.addWidget(tile)
+    assert tile.width() * 3 + 2 * 8 <= 330  # sobra espaço para a barra de rolagem
+
+
+def test_long_package_name_keeps_full_text_and_tooltip(qtbot):
+    name = "br.com.provedor.aplicativo.muito.comprido"
+    entry = AppEntry(package=name, name=name, color="#6B7280", favorite=False, hidden=False)
+    tile = AppTile(entry)
+    qtbot.addWidget(tile)
+    assert tile.name_label.text() == name and tile.name_label.toolTip() == name
+    assert tile.name_label.sizeHint().width() <= tile.width()
+
+
+def test_grid_never_scrolls_horizontally(qtbot, env):
+    from PySide6.QtWidgets import QScrollArea
+
+    _, session = env
+    tab = make_tab(qtbot, session, AppConfig(), expected_tiles=3)
+    area = tab.findChild(QScrollArea)
+    assert area.horizontalScrollBarPolicy() == Qt.ScrollBarAlwaysOff

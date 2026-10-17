@@ -58,3 +58,8 @@ def test_icon_color_changes_pixels(qapp):
     red = icon("home", "#FF0000").pixmap(48, 48).toImage()
     blue = icon("home", "#0000FF").pixmap(48, 48).toImage()
     assert red != blue
+
+
+def test_stylesheet_styles_the_activity_total_with_the_accent():
+    sheet = build_stylesheet("#E50914")
+    assert "QLabel#total" in sheet and "color: #E50914" in sheet.split("QLabel#total")[1].split("}")[0]

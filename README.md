@@ -7,16 +7,33 @@ Feito em Python (PySide6), com a lógica separada da interface e testada sem pre
 
 ## O que faz
 
-- **Controle remoto:** direcionais, OK, Voltar, Início, Menu, play/pause, retroceder e avançar.
-  Atalhos: setas, Enter (OK) e Esc (Voltar), que não disparam enquanto você digita em um campo de texto.
-- **Digitação:** escreva no teclado do PC e envie para o campo de texto aberto na TV.
-  O Android só aceita ASCII simples nesse modo: acentos e `%` são ignorados e o app avisa quais.
-- **Volume (experimental):** mais, menos e mudo. Em um Stick depende de HDMI-CEC e pode não responder.
-- **Apps:** grade dos apps instalados, com busca, favoritos e opção de esconder/mostrar apps.
-- **Início:** app em execução na TV e faixa de favoritos.
-- **Reconexão automática** se a conexão cair.
+O app vive na **bandeja do sistema** (perto do relógio). Clique no ícone para abrir o painel, e clique fora
+para fechá-lo. Para encerrar de verdade, use o botão direito no ícone e escolha **Sair**.
+Ao abrir, ele conecta sozinho ao IP salvo.
 
-Fora da versão 1: entrada HDMI, espelhamento e captura de tela, estatísticas, e conexão sem ADB.
+![Início](docs/screenshots/home.png) ![Controle](docs/screenshots/remote.png) ![Apps](docs/screenshots/apps.png)
+
+- **Início:** o app em execução na TV, volume e os 4 primeiros favoritos. A cor de destaque do painel muda
+  conforme o app (vermelho no YouTube e Netflix, azul no Prime Video).
+- **Controle:** direcional circular, Início, Voltar, Menu, mídia e teclado. Atalhos: setas, Enter (OK) e Esc (Voltar),
+  que não disparam enquanto você digita em um campo de texto. O Android só aceita ASCII simples ao digitar:
+  acentos e `%` são ignorados e o app avisa quais.
+- **Apps:** grade dos apps instalados, com busca, favoritos (estrela), opção de esconder/mostrar apps
+  (botão direito no app) e o rótulo NA TELA no app que está aberto.
+- **Atividade:** tempo por app em primeiro plano no Stick, em Hoje, 7 dias e 30 dias. O histórico é guardado
+  só no seu PC (`activity.json`) e começa a contar a partir do primeiro uso. O Stick não informa se a TV está
+  desligada, então o tempo pode incluir períodos com a TV apagada.
+- **Ajustes:** nome da TV, IP do Stick, conectar e o **Diagnóstico de volume**.
+
+### Volume
+
+Em um Stick, o volume depende de como o controle físico fala com a TV (HDMI-CEC ou infravermelho).
+O **Diagnóstico de volume** (em Ajustes) testa 4 jeitos de mandar "volume +" e pergunta qual mexeu na TV;
+o app passa a usar o escolhido. Se nenhum funcionar, o volume parece depender do infravermelho do controle
+físico, que o PC não consegue reproduzir, e os botões de volume somem.
+
+Fora do escopo: entrada HDMI, ajustes de imagem, transmitir arquivo, cursor da TV, botão de ligar,
+logos oficiais dos apps e conexão sem ADB.
 
 ## Configurar o Stick (uma vez)
 
@@ -65,22 +82,26 @@ Comando manual equivalente: `pyinstaller --noconfirm --onefile --noconsole --nam
 
 ## Arquitetura
 
-Três camadas: **interface** (`firetv/ui`), **controle** (`controller.py`, `session.py`, `apps.py`) e
-**conexão ADB** (`connection.py`, a única que fala com o Stick). A interface não conhece ADB;
-trocar a conexão por outra implementação não mexe no resto.
+Três camadas: **interface** (`firetv/ui`: `panel.py`, abas, componentes e tema), **controle**
+(`controller.py`, `session.py`, `apps.py`, `activity.py`, `volume.py`, `config.py`) e **conexão ADB**
+(`connection.py`, a única que fala com o Stick). A interface não conhece ADB; trocar a conexão por outra
+implementação não mexe no resto. A lógica é testada com uma conexão falsa (`tests/fakes.py`).
 
-## Roteiro de teste manual (no Stick real)
+## Roteiro de teste manual (no Windows, com o Stick real)
 
 Com o PC no cabo e o Stick no wifi:
 
-- [ ] conectar pelo IP e aceitar a autorização na TV
-- [ ] direcionais, OK, Voltar e Início respondem
-- [ ] atalhos de teclado funcionam, e não disparam ao digitar no campo de texto
+- [ ] o ícone aparece na bandeja e o clique abre e fecha o painel
+- [ ] o painel aparece perto do relógio e some ao clicar fora
+- [ ] ao abrir, conecta sozinho ao IP salvo (na primeira vez, abre em Ajustes)
+- [ ] direcionais, OK, Voltar e Início respondem; os atalhos de teclado funcionam e não disparam ao digitar
 - [ ] enviar texto simples e texto com acento (o aviso aparece)
-- [ ] botões de volume: anotar se funcionam
-- [ ] grade de apps lista e abre Netflix e YouTube
-- [ ] esconder e mostrar um app; favoritar e ver na tela Início
-- [ ] desligar o Stick e ligar de novo: o app mostra "Reconectando..." e volta
+- [ ] a grade de apps lista e abre Netflix e YouTube; esconder, mostrar e favoritar funcionam
+- [ ] a cor muda ao abrir YouTube e Prime Video
+- [ ] Ajustes > Diagnóstico de volume: anotar qual método mexe no volume da TV
+- [ ] Atividade passa a somar tempo depois de alguns minutos
+- [ ] desligar o Stick e ligar de novo: o rodapé mostra Reconectando e volta
+- [ ] fontes e tamanho ficam legíveis no seu monitor
 
 Pontos a conferir no Stick real (os comandos foram escritos sem acesso a um aparelho):
 `pm list packages` lista os apps de streaming? Os pacotes da tabela em `apps.py` estão certos?

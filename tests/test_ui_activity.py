@@ -117,3 +117,7 @@ def test_showing_the_tab_refreshes_it(qtbot, log):
     log.record(UNKNOWN, 110.0)
     tab.show()
     assert dict(rows(tab))["x.y.z"] == "40 s"
+
+
+def test_total_label_uses_the_themed_object_name(qtbot, log):
+    assert make_tab(qtbot, log).total_label.objectName() == "total"

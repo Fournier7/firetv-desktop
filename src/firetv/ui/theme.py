@@ -55,9 +55,10 @@ QPushButton:disabled {{ color: {MUTED}; }}
 QCheckBox::indicator {{ width: 16px; height: 16px; border-radius: 4px;
     border: 1px solid {MUTED}; background: {PANEL}; }}
 QCheckBox::indicator:checked {{ background: {accent}; border-color: {accent}; }}
-QPushButton[flat="true"] {{ border: 0; background: transparent; color: {accent}; font-size: 16px; }}
+QPushButton[flat="true"] {{ border: 0; background: transparent; color: {accent}; font-size: 13px; }}
 QFrame#bar {{ background: {accent}; border-radius: 3px; }}
 QFrame#glow {{ border: 1px solid {glow}; border-radius: 14px; }}
+QLabel#total {{ font-size: 34px; font-weight: bold; color: {accent}; }}
 QLabel#message {{ color: {ERROR}; }}
 QLabel#help {{ color: {MUTED}; }}
 QLabel#status {{ font-weight: bold; }}
