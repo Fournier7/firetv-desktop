@@ -13,6 +13,8 @@ class AppConfig:
     host: str = ""
     favorites: list[str] = field(default_factory=list)
     hidden: list[str] = field(default_factory=list)
+    tv_name: str = "Fire TV"
+    volume_method: str = ""
 
 
 def config_dir() -> Path:
@@ -32,9 +34,11 @@ def load_config(path: Path | None = None) -> AppConfig:
     try:
         data = json.loads(target.read_text(encoding="utf-8"))
         return AppConfig(
-            host=str(data.get("host", "")),
+            host=str(data.get("host") or ""),
             favorites=list(data.get("favorites", [])),
             hidden=list(data.get("hidden", [])),
+            tv_name=str(data.get("tv_name") or "").strip() or "Fire TV",
+            volume_method=str(data.get("volume_method") or ""),
         )
     except (ValueError, AttributeError, TypeError):
         target.replace(target.with_name(target.name + ".bak"))
