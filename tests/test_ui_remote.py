@@ -1,13 +1,14 @@
 import pytest
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QPoint, Qt
 from PySide6.QtWidgets import QApplication
 
 from fakes import FakeConnection
+from firetv.config import AppConfig
 from firetv.keys import KeyCode
 from firetv.session import Session
 from firetv.ui.remote_tab import RemoteTab
+from firetv.ui.widgets import AudioCard
 
-MSG_VOLUME = "O volume não respondeu neste aparelho. Este recurso é experimental."
 MSG_LOST = "Sem conexão com o Stick. Conecte na aba Ajustes."
 
 
@@ -22,7 +23,7 @@ def env():
 @pytest.fixture
 def tab(qtbot, env):
     _, session = env
-    t = RemoteTab(session)
+    t = RemoteTab(session, AppConfig())
     qtbot.addWidget(t)
     t.show()
     return t
@@ -30,6 +31,14 @@ def tab(qtbot, env):
 
 def sent(conn, command):
     return lambda: command in conn.commands
+
+
+def test_structure(tab):
+    assert set(tab.buttons) == {
+        KeyCode.HOME, KeyCode.BACK, KeyCode.MENU,
+        KeyCode.REWIND, KeyCode.PLAY_PAUSE, KeyCode.FAST_FORWARD,
+    }
+    assert isinstance(tab.audio_card, AudioCard)
 
 
 def test_arrow_up_sends_dpad_up(qtbot, env, tab):
@@ -60,26 +69,58 @@ def test_shortcuts_ignored_while_typing_in_text_field(qtbot, env, tab):
 
 def test_shortcuts_ignored_when_tab_is_hidden(qtbot, env):
     conn, session = env
-    hidden = RemoteTab(session)
+    hidden = RemoteTab(session, AppConfig())
     qtbot.addWidget(hidden)
     qtbot.keyClick(hidden, Qt.Key_Up)
     qtbot.wait(150)
     assert conn.commands == []
 
 
-def test_button_click_sends_key(qtbot, env, tab):
+@pytest.mark.parametrize(
+    "key, command",
+    [(KeyCode.HOME, "input keyevent 3"), (KeyCode.BACK, "input keyevent 4"),
+     (KeyCode.MENU, "input keyevent 82"), (KeyCode.REWIND, "input keyevent 89"),
+     (KeyCode.PLAY_PAUSE, "input keyevent 85"), (KeyCode.FAST_FORWARD, "input keyevent 90")],
+)
+def test_button_click_sends_key(qtbot, env, tab, key, command):
     conn, _ = env
-    tab.buttons[KeyCode.HOME].click()
-    qtbot.waitUntil(sent(conn, "input keyevent 3"), timeout=3000)
+    tab.buttons[key].click()
+    qtbot.waitUntil(sent(conn, command), timeout=3000)
 
 
-def test_send_text_button_sends_text(qtbot, env, tab):
+@pytest.mark.parametrize(
+    "pos, command",
+    [(QPoint(100, 15), "input keyevent 19"), (QPoint(100, 185), "input keyevent 20"),
+     (QPoint(15, 100), "input keyevent 21"), (QPoint(185, 100), "input keyevent 22"),
+     (QPoint(100, 100), "input keyevent 23")],
+)
+def test_dpad_click_sends_key(qtbot, env, tab, pos, command):
+    conn, _ = env
+    qtbot.mouseClick(tab.dpad, Qt.LeftButton, pos=pos)
+    qtbot.waitUntil(sent(conn, command), timeout=3000)
+
+
+def test_send_text_button_sends_text_and_clears_field(qtbot, env, tab):
     conn, _ = env
     tab.text_edit.setText("oi mundo")
     tab.send_button.click()
     qtbot.waitUntil(sent(conn, "input text 'oi%smundo'"), timeout=3000)
     qtbot.waitUntil(lambda: tab.text_edit.text() == "", timeout=3000)
     assert tab.notice_label.text() == ""
+
+
+def test_return_in_text_field_sends_text(qtbot, env, tab):
+    conn, _ = env
+    tab.text_edit.setText("abc")
+    qtbot.keyClick(tab.text_edit, Qt.Key_Return)
+    qtbot.waitUntil(sent(conn, "input text 'abc'"), timeout=3000)
+
+
+def test_empty_text_sends_nothing(qtbot, env, tab):
+    conn, _ = env
+    tab.send_button.click()
+    qtbot.wait(150)
+    assert conn.commands == []
 
 
 def test_skipped_characters_notice(qtbot, env, tab):
@@ -91,22 +132,10 @@ def test_skipped_characters_notice(qtbot, env, tab):
     assert conn.commands == ["input text 'ao'"]
 
 
-def test_volume_buttons_labelled_experimental(tab):
-    assert tab.volume_label.text() == "Volume (experimental)"
-    assert set(tab.volume_buttons) == {KeyCode.VOLUME_DOWN, KeyCode.MUTE, KeyCode.VOLUME_UP}
-
-
-def test_volume_failure_shows_notice(qtbot, env, tab):
-    conn, _ = env
-    conn.responses["input keyevent 24"] = "Error: not supported"
-    tab.volume_buttons[KeyCode.VOLUME_UP].click()
-    qtbot.waitUntil(lambda: tab.notice_label.text() == MSG_VOLUME, timeout=3000)
-
-
 def test_command_without_connection_shows_notice(qtbot):
     conn = FakeConnection()
     session = Session(lambda: conn, sleep=lambda s: None)
-    t = RemoteTab(session)
+    t = RemoteTab(session, AppConfig())
     qtbot.addWidget(t)
-    t.buttons[KeyCode.OK].click()
+    t.buttons[KeyCode.HOME].click()
     qtbot.waitUntil(lambda: t.notice_label.text() == MSG_LOST, timeout=3000)

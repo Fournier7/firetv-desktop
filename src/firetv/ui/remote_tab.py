@@ -1,4 +1,4 @@
-"""Aba Controle: direcionais, mídia, texto, volume e atalhos de teclado."""
+"""Aba Controle: direcional circular, mídia, teclado, volume e atalhos de teclado."""
 from __future__ import annotations
 
 from typing import Callable
@@ -7,7 +7,6 @@ from PySide6.QtCore import QEvent, Qt
 from PySide6.QtWidgets import (
     QAbstractSpinBox,
     QApplication,
-    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -17,15 +16,16 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from firetv.config import AppConfig
 from firetv.connection import ConnectionLostError
 from firetv.controller import Controller
 from firetv.keys import KeyCode
 from firetv.session import Session
+from firetv.ui.icons import icon
+from firetv.ui.widgets import AudioCard, Card, DPad
 from firetv.ui.worker import run_in_background
 
-MSG_VOLUME = "O volume não respondeu neste aparelho. Este recurso é experimental."
 MSG_LOST = "Sem conexão com o Stick. Conecte na aba Ajustes."
-VOLUME_LABEL = "Volume (experimental)"
 
 _SHORTCUTS = {
     Qt.Key_Up: KeyCode.UP,
@@ -37,63 +37,68 @@ _SHORTCUTS = {
     Qt.Key_Escape: KeyCode.BACK,
 }
 _TEXT_WIDGETS = (QLineEdit, QTextEdit, QAbstractSpinBox)
-
-_LABELS = {
-    KeyCode.UP: "▲", KeyCode.DOWN: "▼", KeyCode.LEFT: "◀", KeyCode.RIGHT: "▶",
-    KeyCode.OK: "OK", KeyCode.BACK: "Voltar", KeyCode.HOME: "Início", KeyCode.MENU: "Menu",
-    KeyCode.REWIND: "⏪", KeyCode.PLAY_PAUSE: "⏯", KeyCode.FAST_FORWARD: "⏩",
-    KeyCode.VOLUME_DOWN: "Vol −", KeyCode.MUTE: "Mudo", KeyCode.VOLUME_UP: "Vol +",
-}
-_GRID = {  # tecla -> (linha, coluna)
-    KeyCode.UP: (0, 1), KeyCode.LEFT: (1, 0), KeyCode.OK: (1, 1), KeyCode.RIGHT: (1, 2),
-    KeyCode.DOWN: (2, 1),
-    KeyCode.BACK: (3, 0), KeyCode.HOME: (3, 1), KeyCode.MENU: (3, 2),
-    KeyCode.REWIND: (4, 0), KeyCode.PLAY_PAUSE: (4, 1), KeyCode.FAST_FORWARD: (4, 2),
+_ICONS = {
+    KeyCode.HOME: "home", KeyCode.BACK: "back", KeyCode.MENU: "menu",
+    KeyCode.REWIND: "rewind", KeyCode.PLAY_PAUSE: "play_pause", KeyCode.FAST_FORWARD: "forward",
 }
 
 
 class RemoteTab(QWidget):
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, cfg: AppConfig) -> None:
         super().__init__()
         self._session = session
 
-        self.notice_label = QLabel("")
-        self.notice_label.setObjectName("message")
-        self.notice_label.setWordWrap(True)
-
-        grid = QGridLayout()
+        self.dpad = DPad()
+        self.dpad.pressed.connect(self._press)
         self.buttons: dict[KeyCode, QPushButton] = {}
-        for key, (row, col) in _GRID.items():
-            button = QPushButton(_LABELS[key])
-            button.setMinimumHeight(48)
+
+        def make(key: KeyCode) -> QPushButton:
+            button = QPushButton()
+            button.setIcon(icon(_ICONS[key]))
+            button.setMinimumHeight(44)
             button.clicked.connect(lambda _=False, k=key: self._press(k))
             self.buttons[key] = button
-            grid.addWidget(button, row, col)
+            return button
 
-        self.volume_label = QLabel(VOLUME_LABEL)
-        self.volume_label.setObjectName("help")
-        volume_row = QHBoxLayout()
-        self.volume_buttons: dict[KeyCode, QPushButton] = {}
-        for key in (KeyCode.VOLUME_DOWN, KeyCode.MUTE, KeyCode.VOLUME_UP):
-            button = QPushButton(_LABELS[key])
-            button.clicked.connect(lambda _=False, k=key: self._volume(k))
-            self.volume_buttons[key] = button
-            volume_row.addWidget(button)
+        side_left = QVBoxLayout()
+        side_left.addWidget(make(KeyCode.HOME))
+        side_left.addWidget(make(KeyCode.BACK))
+        side_left.addStretch(1)
+        side_right = QVBoxLayout()
+        side_right.addWidget(make(KeyCode.MENU))
+        side_right.addStretch(1)
+        pad_row = QHBoxLayout()
+        pad_row.addLayout(side_left)
+        pad_row.addWidget(self.dpad, 0, Qt.AlignCenter)
+        pad_row.addLayout(side_right)
+        media_row = QHBoxLayout()
+        for key in (KeyCode.REWIND, KeyCode.PLAY_PAUSE, KeyCode.FAST_FORWARD):
+            media_row.addWidget(make(key))
+
+        controls = Card("Controle")
+        controls.body.addLayout(pad_row)
+        controls.body.addLayout(media_row)
 
         self.text_edit = QLineEdit()
-        self.text_edit.setPlaceholderText("Digite aqui para enviar à TV")
+        self.text_edit.setPlaceholderText("Digite no campo aberto na TV")
         self.send_button = QPushButton("Enviar")
         text_row = QHBoxLayout()
         text_row.addWidget(self.text_edit, 1)
         text_row.addWidget(self.send_button)
+        keyboard = Card("Teclado")
+        keyboard.body.addLayout(text_row)
         self.send_button.clicked.connect(self._send_text)
         self.text_edit.returnPressed.connect(self._send_text)
 
+        self.notice_label = QLabel("")
+        self.notice_label.setObjectName("message")
+        self.notice_label.setWordWrap(True)
+        self.audio_card = AudioCard(session, cfg)
+
         layout = QVBoxLayout(self)
-        layout.addLayout(grid)
-        layout.addWidget(self.volume_label)
-        layout.addLayout(volume_row)
-        layout.addLayout(text_row)
+        layout.addWidget(controls)
+        layout.addWidget(keyboard)
+        layout.addWidget(self.audio_card)
         layout.addWidget(self.notice_label)
         layout.addStretch(1)
 
@@ -120,19 +125,10 @@ class RemoteTab(QWidget):
         run_in_background(lambda: self._session.run(op), on_done, self._on_error)
 
     def _on_error(self, exc: Exception) -> None:
-        if isinstance(exc, ConnectionLostError):
-            self.notice_label.setText(MSG_LOST)
-        else:
-            self.notice_label.setText(str(exc))
+        self.notice_label.setText(MSG_LOST if isinstance(exc, ConnectionLostError) else str(exc))
 
     def _press(self, key: KeyCode) -> None:
         self._run(lambda c: c.press(key), lambda _: self.notice_label.setText(""))
-
-    def _volume(self, key: KeyCode) -> None:
-        def done(ok: object) -> None:
-            self.notice_label.setText("" if ok else MSG_VOLUME)
-
-        self._run(lambda c: c.volume(key), done)
 
     def _send_text(self) -> None:
         text = self.text_edit.text()

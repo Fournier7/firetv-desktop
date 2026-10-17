@@ -17,7 +17,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Fire TV Desktop")
         self.resize(440, 760)
         self.home_tab = HomeTab(session, cfg)
-        self.remote_tab = RemoteTab(session)
+        self.remote_tab = RemoteTab(session, cfg)
         self.apps_tab = AppsTab(session, cfg)
         self.settings_tab = SettingsTab(session, cfg)
         self.apps_tab.favorites_changed.connect(self.home_tab.refresh_favorites)
