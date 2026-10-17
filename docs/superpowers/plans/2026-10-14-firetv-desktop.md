@@ -1,0 +1,363 @@
+# Controle Fire TV para Desktop: Plano de Implementação
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Construir um app de desktop para Windows que controla um Fire TV Stick pela rede local via ADB, com controle remoto, digitação de texto, volume, grade de apps e tela de início.
+
+**Architecture:** Três camadas: interface (PySide6), controle (`Controller` e `Session`) e conexão ADB (interface `Connection` com implementação real e falsa). A interface só chama o controle, e só a camada de conexão fala com o Stick.
+
+**Tech Stack:** Python 3, PySide6, adb-shell (ADB por TCP, em Python puro), pytest, pytest-qt, PyInstaller.
+
+**Spec:** Especificação: Controle Fire TV para Desktop (v1), https://claude.ai/code/artifact/29cf40d1-82f4-4a23-9fe1-ae5633fe1377 (documento na conversa; não há cópia no repositório)
+
+## Global Constraints
+
+- Sistema operacional: Windows.
+- Aparelho: Fire TV Stick (Lite, 4K ou 4K Max); ADB pela porta TCP 5555.
+- Python 3; interface em PySide6 (Qt).
+- O IP do Stick é informado pelo usuário; o app não descobre aparelhos na rede.
+- Nenhum ícone ou logo oficial de app: usar cor e iniciais.
+- Volume é experimental e aparece rotulado assim na tela.
+- Configuração em arquivo no perfil do usuário (`config.json`); a chave ADB fica em arquivo separado (`adbkey`), na mesma pasta.
+- Fora da v1: entrada HDMI, espelhamento, captura de tela, estatísticas e protocolo sem ADB.
+- Mensagens ao usuário em português, sem texto técnico cru.
+
+## Review Focus
+
+1. Texto com acentos ou `%` (ex.: ação): o `input text` do Android não aceita esses caracteres. Esperado: enviar o restante e avisar quais foram ignorados. Testes nas Tarefas 3 e 7.
+2. `config.json` ausente ou corrompido: esperado abrir com padrões, sem travar, e guardar o arquivo ruim como `.bak`. Tarefa 1.
+3. IP vazio ou inválido: esperado mensagem clara, sem tentar conectar. Tarefas 1 e 6.
+4. Lista de apps vazia ou pacote fora da tabela: esperado estado vazio com instrução, e o pacote desconhecido aparece pelo próprio nome. Tarefas 4 e 8.
+5. Atalhos de teclado enquanto o usuário digita em um campo de texto ou de busca: setas e Enter não podem virar comandos da TV. Tarefa 7.
+
+---
+
+## Estrutura de arquivos
+
+| Arquivo | Responsabilidade |
+|---|---|
+| `pyproject.toml` | dependências, pytest, ponto de entrada |
+| `src/firetv/keys.py` | códigos de tecla (`KeyCode`) |
+| `src/firetv/config.py` | `AppConfig`, carregar/salvar, validar IP |
+| `src/firetv/connection.py` | erros, interface `Connection`, `AdbConnection` |
+| `src/firetv/text.py` | preparar texto para o `input text` |
+| `src/firetv/apps.py` | tabela de apps conhecidos, listar, buscar, favoritos, escondidos |
+| `src/firetv/controller.py` | `Controller`: teclas, texto, volume, apps, app em execução |
+| `src/firetv/session.py` | `Session`: estado da conexão e reconexão |
+| `src/firetv/ui/` | `theme.py`, `worker.py`, `main_window.py`, `settings_tab.py`, `remote_tab.py`, `apps_tab.py`, `home_tab.py` |
+| `src/firetv/main.py` | inicia o app |
+| `tests/fakes.py` | `FakeConnection` |
+| `README.md`, `LICENSE` | documentação e licença |
+
+---
+
+### Task 1: Projeto base, teclas e configuração
+
+**Files:**
+- Create: `pyproject.toml`, `src/firetv/__init__.py`, `src/firetv/keys.py`, `src/firetv/config.py`
+- Test: `tests/test_keys.py`, `tests/test_config.py`
+
+**Interfaces:**
+- Produces: `KeyCode(IntEnum)` com UP=19, DOWN=20, LEFT=21, RIGHT=22, OK=23, BACK=4, HOME=3, MENU=82, PLAY_PAUSE=85, REWIND=89, FAST_FORWARD=90, VOLUME_UP=24, VOLUME_DOWN=25, MUTE=164.
+- Produces: `@dataclass AppConfig(host: str = '', favorites: list[str] = [], hidden: list[str] = [])`, `config_dir() -> Path` (`%APPDATA%/firetv-desktop`, ou a pasta do usuário se `APPDATA` não existir), `load_config(path: Path | None = None) -> AppConfig`, `save_config(cfg: AppConfig, path: Path | None = None) -> None`, `validate_host(value: str) -> str` (IPv4, retorna o valor sem espaços, levanta `ValueError` se vazio ou inválido).
+
+- [ ] **Step 1: Escrever os testes**
+
+```python
+def test_keycode_values():            # fixa os códigos acima
+    assert KeyCode.UP == 19 and KeyCode.OK == 23 and KeyCode.MUTE == 164
+def test_config_roundtrip(tmp_path):  # salva e recarrega host, favorites, hidden
+def test_load_missing_returns_defaults(tmp_path):
+    assert load_config(tmp_path / 'config.json') == AppConfig()
+def test_load_corrupt_returns_defaults_and_keeps_bak(tmp_path):
+    # escreve '{ruim' em config.json; load devolve AppConfig(); existe config.json.bak
+def test_validate_host():
+    assert validate_host(' 192.168.0.10 ') == '192.168.0.10'
+    for ruim in ['', 'abc', '999.1.1.1', '192.168.0']:
+        with pytest.raises(ValueError): validate_host(ruim)
+```
+
+- [ ] **Step 2: Rodar `pytest tests -v`. Esperado: FAIL (módulos não existem).**
+- [ ] **Step 3: Criar o `pyproject.toml` (dependências acima, `pythonpath = ['src']` no pytest) e implementar `keys.py` e `config.py` com as assinaturas acima.** No `load_config`, JSON inválido renomeia o arquivo para `.bak` e devolve os padrões.
+- [ ] **Step 4: Rodar `pytest tests -v`. Esperado: PASS.**
+- [ ] **Step 5: Commit**
+
+```bash
+git add . && git commit -m 'feat: projeto base, teclas e configuração'
+```
+
+---
+
+### Task 2: Camada de conexão
+
+**Files:**
+- Create: `src/firetv/connection.py`, `tests/fakes.py`
+- Test: `tests/test_connection.py`
+
+**Interfaces:**
+- Consumes: `config_dir()` (Task 1).
+- Produces: `FireTvError(Exception)` e as subclasses `ConnectionFailedError`, `AuthRequiredError`, `ConnectionLostError`.
+- Produces: `Connection(Protocol)` com `connect(host: str, port: int = 5555) -> None`, `disconnect() -> None`, `is_connected() -> bool`, `shell(command: str) -> str`.
+- Produces: `AdbConnection` (implementa `Connection` com `adb_shell.adb_device.AdbDeviceTcp`; cria o par de chaves `adbkey` em `config_dir()` na primeira conexão; timeout de conexão de 5 s). Falha de rede em `connect` vira `ConnectionFailedError`; recusa de autorização vira `AuthRequiredError`; `shell` sem conexão ou com socket caído vira `ConnectionLostError`.
+- Produces (em `tests/fakes.py`): `FakeConnection` com `commands: list[str]`, `responses: dict[str, str]` (resposta por comando), `fail_connect: Exception | None`, `drop_next: bool` (o próximo `shell` levanta `ConnectionLostError` e marca como desconectado).
+
+- [ ] **Step 1: Escrever os testes**
+
+```python
+def test_fake_records_commands():
+    c = FakeConnection(); c.connect('1.2.3.4'); c.shell('echo oi')
+    assert c.commands == ['echo oi']
+def test_adb_timeout_maps_to_connection_failed(monkeypatch):  # dispositivo falso levanta TcpTimeoutException
+def test_adb_auth_error_maps_to_auth_required(monkeypatch):   # dispositivo falso levanta AdbAuthError
+def test_shell_when_not_connected_raises_connection_lost():
+    with pytest.raises(ConnectionLostError): AdbConnection().shell('ls')
+```
+
+- [ ] **Step 2: Rodar `pytest tests/test_connection.py -v`. Esperado: FAIL.**
+- [ ] **Step 3: Implementar `connection.py` e `tests/fakes.py`.** Os testes de `AdbConnection` trocam a classe do dispositivo por uma falsa com `monkeypatch`; nenhum teste usa rede de verdade.
+- [ ] **Step 4: Rodar `pytest tests/test_connection.py -v`. Esperado: PASS.**
+- [ ] **Step 5: Commit** (`feat: camada de conexão ADB e conexão falsa`)
+
+---
+
+### Task 3: Controller: teclas, texto e volume
+
+**Files:**
+- Create: `src/firetv/text.py`, `src/firetv/controller.py`
+- Test: `tests/test_text.py`, `tests/test_controller_keys.py`
+
+**Interfaces:**
+- Consumes: `Connection.shell`, `KeyCode`.
+- Produces: `prepare_text(text: str) -> tuple[str, str]` (devolve o texto pronto e os caracteres ignorados). Regras: espaço vira `%s`; `'` vira `'\''`; caracteres não ASCII e `%` são ignorados.
+- Produces: `@dataclass SendTextResult(sent: int, skipped: str)`.
+- Produces: `Controller(conn: Connection)` com `press(key: KeyCode) -> None` (roda `input keyevent <código>`), `send_text(text: str) -> SendTextResult` (roda `input text '<pronto>'`; não envia nada se o texto pronto for vazio) e `volume(key: KeyCode) -> bool` (aceita VOLUME_UP, VOLUME_DOWN ou MUTE; devolve False se a saída do comando contiver `error` ou `exception`, sem diferenciar maiúsculas).
+
+- [ ] **Step 1: Escrever os testes**
+
+```python
+def test_prepare_text_space():  assert prepare_text('oi mundo') == ('oi%smundo', '')
+def test_prepare_text_accents(): assert prepare_text('ação') == ('ao', 'çã')
+def test_prepare_text_percent(): assert prepare_text('5%') == ('5', '%')
+def test_press_sends_keyevent():
+    ctl.press(KeyCode.UP); assert conn.commands == ['input keyevent 19']
+def test_send_text_command():
+    r = ctl.send_text("it's"); assert conn.commands == ["input text 'it'\\''s'"] and r.sent == 4
+def test_send_text_reports_skipped():
+    r = ctl.send_text('ação'); assert r.skipped == 'çã' and conn.commands == ["input text 'ao'"]
+def test_send_text_empty_sends_nothing():
+    assert ctl.send_text('').sent == 0 and conn.commands == []
+def test_volume_false_on_error_output():
+    conn.responses['input keyevent 24'] = 'Error: not supported'
+    assert ctl.volume(KeyCode.VOLUME_UP) is False
+```
+
+- [ ] **Step 2: Rodar `pytest tests/test_text.py tests/test_controller_keys.py -v`. Esperado: FAIL.**
+- [ ] **Step 3: Implementar `text.py` e `Controller` com as assinaturas acima.**
+- [ ] **Step 4: Rodar os mesmos testes. Esperado: PASS.**
+- [ ] **Step 5: Commit** (`feat: teclas, texto e volume no controller`)
+
+---
+
+### Task 4: Apps: tabela, listar, abrir, favoritos, escondidos e busca
+
+**Files:**
+- Create: `src/firetv/apps.py`
+- Modify: `src/firetv/controller.py`
+- Test: `tests/test_apps.py`
+
+**Interfaces:**
+- Consumes: `AppConfig` (Task 1), `Controller` (Task 3).
+- Produces: `KNOWN_APPS: dict[str, tuple[str, str]]` (pacote → nome e cor hexadecimal), com `com.netflix.ninja` → Netflix `#E50914`, `com.amazon.firetv.youtube` → YouTube `#FF0000`, `com.amazon.avod` → Prime Video `#00A8E1`, `com.disney.disneyplus` → Disney+ `#113CCF`. Os pacotes precisam ser conferidos no Stick real (Step 6).
+- Produces: `@dataclass AppEntry(package: str, name: str, color: str, favorite: bool, hidden: bool)`.
+- Produces: `parse_packages(output: str) -> list[str]` (linhas `package:<nome>`), `build_entries(packages: list[str], cfg: AppConfig) -> list[AppEntry]` (ordenado por nome sem diferenciar maiúsculas; pacote desconhecido usa o próprio pacote como nome e cor `#6B7280`), `search(entries: list[AppEntry], query: str) -> list[AppEntry]` (trecho do nome ou do pacote, sem diferenciar maiúsculas), `toggle_favorite(cfg: AppConfig, package: str) -> None`, `toggle_hidden(cfg: AppConfig, package: str) -> None`.
+- Produces: `Controller.list_apps(cfg: AppConfig, show_hidden: bool = False) -> list[AppEntry]` (roda `pm list packages`) e `Controller.launch(package: str) -> None` (roda `monkey -p <pacote> -c android.intent.category.LAUNCHER 1`).
+
+- [ ] **Step 1: Escrever os testes**
+
+```python
+def test_parse_packages(): assert parse_packages('package:a.b\npackage:c.d\n') == ['a.b', 'c.d']
+def test_known_package_gets_name_and_color():  # com.netflix.ninja -> 'Netflix', '#E50914'
+def test_unknown_package_uses_package_as_name(): # name == 'x.y.z', color == '#6B7280'
+def test_entries_sorted_case_insensitive():
+def test_search_matches_name_and_package():
+def test_toggle_favorite_and_hidden_are_reversible():
+def test_list_apps_hides_hidden_by_default_and_shows_on_request():
+def test_list_apps_empty_output_returns_empty_list():
+def test_launch_command():
+    ctl.launch('com.netflix.ninja')
+    assert conn.commands[-1] == 'monkey -p com.netflix.ninja -c android.intent.category.LAUNCHER 1'
+```
+
+- [ ] **Step 2: Rodar `pytest tests/test_apps.py -v`. Esperado: FAIL.**
+- [ ] **Step 3: Implementar `apps.py` e acrescentar `list_apps` e `launch` ao `Controller`.**
+- [ ] **Step 4: Rodar `pytest tests/test_apps.py -v`. Esperado: PASS.**
+- [ ] **Step 5: Commit** (`feat: apps, favoritos, escondidos e busca`)
+- [ ] **Step 6 (manual, Willian, com o Stick ligado): rodar `pm list packages` pelo ADB e anotar se os apps de streaming aparecem e se os quatro pacotes da tabela estão certos.** Se apps de sistema faltarem ou sobrarem, ajustar o comando em `list_apps` e voltar aqui.
+
+---
+
+### Task 5: App em execução e sessão com reconexão
+
+**Files:**
+- Create: `src/firetv/session.py`
+- Modify: `src/firetv/controller.py`
+- Test: `tests/test_session.py`, `tests/test_foreground.py`
+
+**Interfaces:**
+- Consumes: `Connection`, `ConnectionLostError`, `Controller`.
+- Produces: `parse_focus(output: str) -> str | None` (extrai o pacote de `mCurrentFocus=Window{... pacote/atividade}`; devolve None se não achar) e `Controller.current_app() -> str | None` (roda `dumpsys window | grep mCurrentFocus`).
+- Produces: `POLL_INTERVAL_SECONDS = 3`, `ConnectionState(Enum)` com DISCONNECTED, CONNECTED, RECONNECTING.
+- Produces: `Session(conn_factory: Callable[[], Connection], sleep: Callable[[float], None] = time.sleep)` com `state: ConnectionState`, `controller: Controller`, `on_state_change: Callable[[ConnectionState], None] | None`, `connect(host: str) -> None` (propaga `ConnectionFailedError` e `AuthRequiredError`) e `run(op: Callable[[Controller], T]) -> T`. Em `ConnectionLostError`, o estado vira RECONNECTING e a sessão tenta reconectar até 3 vezes, esperando 1, 2 e 4 s; se reconectar, roda `op` mais uma vez. Se as 3 tentativas falharem, o estado vira DISCONNECTED e a exceção é levantada.
+
+- [ ] **Step 1: Escrever os testes**
+
+```python
+def test_parse_focus_extracts_package():
+    s = 'mCurrentFocus=Window{abc u0 com.netflix.ninja/com.netflix.ninja.MainActivity}'
+    assert parse_focus(s) == 'com.netflix.ninja'
+def test_parse_focus_none_when_no_match(): assert parse_focus('') is None
+def test_session_reconnects_after_drop():
+    # FakeConnection.drop_next=True; run(lambda c: c.current_app()) funciona
+    # estado final CONNECTED; sleeps == [1]
+def test_session_gives_up_after_three_failures():
+    # reconexão sempre falha; levanta ConnectionLostError; estado DISCONNECTED; sleeps == [1, 2, 4]
+def test_session_notifies_state_changes():  # RECONNECTING depois CONNECTED
+def test_connect_propagates_auth_required():
+```
+
+- [ ] **Step 2: Rodar `pytest tests/test_session.py tests/test_foreground.py -v`. Esperado: FAIL.**
+- [ ] **Step 3: Implementar `parse_focus`, `Controller.current_app` e `Session`.**
+- [ ] **Step 4: Rodar os mesmos testes. Esperado: PASS.**
+- [ ] **Step 5: Commit** (`feat: app em execução e reconexão automática`)
+- [ ] **Step 6 (manual, Willian): rodar o comando de `current_app` no Stick real, com um app aberto, e conferir se `parse_focus` devolve o pacote certo.**
+
+---
+
+### Task 6: Interface base e aba Ajustes
+
+**Files:**
+- Create: `src/firetv/ui/theme.py`, `src/firetv/ui/worker.py`, `src/firetv/ui/main_window.py`, `src/firetv/ui/settings_tab.py`, `src/firetv/main.py`
+- Test: `tests/test_ui_settings.py` (pytest-qt, com `QT_QPA_PLATFORM=offscreen`)
+
+**Interfaces:**
+- Consumes: `Session`, `ConnectionState`, `AppConfig`, `validate_host`, `save_config`.
+- Produces: `STYLESHEET: str` (tema escuro, como nas imagens de referência), `run_in_background(fn: Callable[[], T], on_done: Callable[[T], None], on_error: Callable[[Exception], None]) -> None` (executa `fn` fora da thread da interface) e `MainWindow(session: Session, cfg: AppConfig)` com as abas na ordem Início, Controle, Apps e Ajustes.
+- Produces: `SettingsTab(session, cfg)` com campo de IP, botão Conectar e rótulo de status.
+
+**Mensagens (texto exato):**
+- IP inválido: `Digite um IP válido, por exemplo 192.168.0.10.`
+- `ConnectionFailedError`: `Não foi possível alcançar o Stick. Confira o IP, se a TV está ligada e se o PC e a TV estão na mesma rede.`
+- `AuthRequiredError`: `Aceite o pedido de autorização que apareceu na TV e conecte de novo.`
+- Ajuda fixa na aba: `No Stick: Configurações > Meu Fire TV > Opções do desenvolvedor > Depuração ADB.`
+- Status: `Conectado`, `Desconectado`, `Reconectando...`
+
+- [ ] **Step 1: Escrever os testes** (usam `Session` com `FakeConnection`)
+
+```python
+def test_connect_with_valid_host_calls_session_and_saves_host(qtbot):
+def test_invalid_host_shows_message_and_does_not_connect(qtbot):  # '999.1.1.1'
+def test_empty_host_shows_message(qtbot):
+def test_connection_failed_shows_network_message(qtbot):
+def test_auth_required_shows_authorization_message(qtbot):
+def test_status_label_follows_state(qtbot):  # os três textos de status
+```
+
+- [ ] **Step 2: Rodar `pytest tests/test_ui_settings.py -v`. Esperado: FAIL.**
+- [ ] **Step 3: Implementar tema, `run_in_background`, `MainWindow` (abas Início, Controle e Apps como espaços reservados) e `SettingsTab`; `main.py` monta `Session(AdbConnection)`, carrega a configuração e abre a janela.**
+- [ ] **Step 4: Rodar `pytest tests/test_ui_settings.py -v`. Esperado: PASS.**
+- [ ] **Step 5: Commit** (`feat: janela, tema e aba Ajustes`)
+
+---
+
+### Task 7: Aba Controle: botões, atalhos, texto e volume
+
+**Files:**
+- Create: `src/firetv/ui/remote_tab.py`
+- Modify: `src/firetv/ui/main_window.py`
+- Test: `tests/test_ui_remote.py`
+
+**Interfaces:**
+- Consumes: `Session.run`, `Controller.press`, `Controller.send_text`, `Controller.volume`, `run_in_background`.
+- Produces: `RemoteTab(session: Session)` com botões para todas as teclas de `KeyCode`, campo de texto com botão Enviar, e botões de volume com o rótulo `Volume (experimental)`.
+- Atalhos: setas, Enter (OK) e Esc (Voltar). Eles só valem quando o foco não está em um `QLineEdit`.
+- Avisos: texto com caracteres ignorados mostra `Não foi possível enviar: <caracteres>`; volume com resposta False mostra `O volume não respondeu neste aparelho. Este recurso é experimental.`
+
+- [ ] **Step 1: Escrever os testes**
+
+```python
+def test_arrow_up_sends_dpad_up(qtbot):
+    qtbot.keyClick(tab, Qt.Key_Up); assert 'input keyevent 19' in conn.commands
+def test_enter_and_escape_map_to_ok_and_back(qtbot):
+def test_shortcuts_ignored_while_typing_in_text_field(qtbot):
+    # foco no campo de texto; keyClick(Key_Up) não gera comando
+def test_send_text_button_sends_text(qtbot):
+def test_skipped_characters_notice(qtbot):  # 'ação' -> aviso contém 'çã'
+def test_volume_buttons_labelled_experimental(qtbot):
+def test_volume_failure_shows_notice(qtbot):
+```
+
+- [ ] **Step 2: Rodar `pytest tests/test_ui_remote.py -v`. Esperado: FAIL.**
+- [ ] **Step 3: Implementar `RemoteTab` e trocar o espaço reservado em `MainWindow`.**
+- [ ] **Step 4: Rodar `pytest tests/test_ui_remote.py -v`. Esperado: PASS.**
+- [ ] **Step 5: Commit** (`feat: aba Controle com atalhos, texto e volume`)
+
+---
+
+### Task 8: Abas Apps e Início
+
+**Files:**
+- Create: `src/firetv/ui/apps_tab.py`, `src/firetv/ui/home_tab.py`
+- Modify: `src/firetv/ui/main_window.py`
+- Test: `tests/test_ui_apps.py`, `tests/test_ui_home.py`
+
+**Interfaces:**
+- Consumes: `Controller.list_apps`, `Controller.launch`, `Controller.current_app`, `toggle_favorite`, `toggle_hidden`, `search`, `save_config`, `POLL_INTERVAL_SECONDS`, `KNOWN_APPS`.
+- Produces: `AppTile(entry: AppEntry)`, quadrado colorido com as iniciais do app, o nome e a estrela de favorito (sem logos oficiais).
+- Produces: `AppsTab(session, cfg)` com campo de busca, grade de `AppTile`, opção `Mostrar apps escondidos` e menu de contexto `Esconder` ou `Mostrar` em cada tile. Lista vazia mostra `Nenhum app encontrado. Conecte ao Stick na aba Ajustes.`
+- Produces: `HomeTab(session, cfg)` com o nome do app em execução (nome da tabela ou o pacote) e a faixa de favoritos, que usa os mesmos favoritos da grade. Um `QTimer` consulta `current_app` a cada `POLL_INTERVAL_SECONDS` segundos, só enquanto o estado for CONNECTED.
+
+- [ ] **Step 1: Escrever os testes**
+
+```python
+def test_grid_hides_hidden_apps_by_default(qtbot):
+def test_show_hidden_option_reveals_them(qtbot):
+def test_star_click_toggles_favorite_and_saves_config(qtbot):
+def test_search_filters_grid(qtbot):
+def test_empty_list_shows_empty_state_message(qtbot):
+def test_unknown_package_tile_shows_package_name(qtbot):
+def test_tile_click_launches_package(qtbot):
+def test_home_shows_current_app_name(qtbot):  # dumpsys com com.netflix.ninja -> 'Netflix'
+def test_home_favorites_match_apps_tab(qtbot):
+def test_home_polling_stops_when_disconnected(qtbot):
+```
+
+- [ ] **Step 2: Rodar `pytest tests/test_ui_apps.py tests/test_ui_home.py -v`. Esperado: FAIL.**
+- [ ] **Step 3: Implementar `AppTile`, `AppsTab` e `HomeTab`, e trocar os espaços reservados em `MainWindow`.**
+- [ ] **Step 4: Rodar os mesmos testes. Esperado: PASS.**
+- [ ] **Step 5: Commit** (`feat: abas Apps e Início`)
+
+---
+
+### Task 9: Empacotamento, README e roteiro manual
+
+**Files:**
+- Create: `README.md`, `LICENSE` (MIT)
+- Modify: `pyproject.toml` (dependência de desenvolvimento `pyinstaller`)
+
+**Interfaces:**
+- Consumes: o app completo (Tarefas 1 a 8).
+- Produces: executável em `dist/FireTVDesktop/`, gerado por `pyinstaller --noconsole --name FireTVDesktop src/firetv/main.py`.
+
+- [ ] **Step 1: Rodar a suíte completa com `pytest -v`. Esperado: todos os testes passam.**
+- [ ] **Step 2: Escrever o `README.md` com estas seções:** o que é; como ativar a depuração ADB no Stick; aviso sobre rede de convidados e isolamento de clientes, e a sugestão de reservar IP fixo no roteador; instalação e uso; limites (sem HDMI, espelhamento e estatísticas; volume experimental); roteiro manual abaixo; licença.
+- [ ] **Step 3: Gerar o executável e abrir o app no Windows.** Esperado: a janela abre sem terminal.
+- [ ] **Step 4 (manual, Willian): roteiro no Stick real, com o PC no cabo e o Stick no wifi.**
+  - [ ] conectar pelo IP e aceitar a autorização na TV
+  - [ ] direcionais, OK, Voltar e Início respondem
+  - [ ] atalhos de teclado funcionam, e não disparam ao digitar no campo de texto
+  - [ ] enviar texto simples e texto com acento (aviso aparece)
+  - [ ] botões de volume: anotar se funcionam
+  - [ ] grade de apps lista e abre Netflix e YouTube
+  - [ ] esconder e mostrar um app; favoritar e ver na tela Início
+  - [ ] desligar o Stick e ligar de novo: o app mostra Reconectando e volta
+- [ ] **Step 5: Commit** (`docs: README, licença e empacotamento`)
