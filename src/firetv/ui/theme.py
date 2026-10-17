@@ -20,6 +20,10 @@ QPushButton {{ background: {PANEL}; border: 1px solid {PANEL_BORDER};
     border-radius: 10px; padding: 8px 14px; }}
 QPushButton:hover {{ border-color: {ACCENT}; }}
 QPushButton:disabled {{ color: {MUTED}; }}
+QCheckBox::indicator {{ width: 16px; height: 16px; border-radius: 4px;
+    border: 1px solid {MUTED}; background: {PANEL}; }}
+QCheckBox::indicator:checked {{ background: {ACCENT}; border-color: {ACCENT}; }}
+QPushButton[flat="true"] {{ border: 0; background: transparent; color: {ACCENT}; font-size: 16px; }}
 QLabel#message {{ color: {ERROR}; }}
 QLabel#help {{ color: {MUTED}; }}
 QLabel#status {{ font-weight: bold; }}
