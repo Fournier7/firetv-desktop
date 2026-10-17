@@ -51,11 +51,17 @@ Os testes usam uma conexão falsa (`tests/fakes.py`): nenhum teste usa rede de v
 
 ## Gerar o executável (Windows)
 
-```bash
-pyinstaller --noconsole --name FireTVDesktop src/firetv/main.py
-```
+**Mais fácil:** instale o Python 3.10 ou mais novo (marque "Add python.exe to PATH") e dê dois cliques em
+`build_exe.bat`. Ele cria o ambiente, instala as dependências e gera **`dist\\FireTVDesktop.exe`**, um arquivo
+único que você pode copiar para onde quiser (não precisa instalar nada para abrir).
 
-O resultado fica em `dist/FireTVDesktop/`.
+Para conferir que o executável sobe e que a chave ADB funciona, rode no terminal
+`start /wait "" dist\\FireTVDesktop.exe --selftest` seguido de `echo %errorlevel%`: deve mostrar `0`.
+
+**Sem instalar Python:** o workflow `.github/workflows/build-windows.yml` gera o `.exe` no GitHub
+(aba Actions > Build Windows > Run workflow) e deixa o arquivo para baixar.
+
+Comando manual equivalente: `pyinstaller --noconfirm --onefile --noconsole --name FireTVDesktop --paths src app.py`.
 
 ## Arquitetura
 
