@@ -18,8 +18,11 @@ Ao abrir, ele conecta sozinho ao IP salvo.
 - **Controle:** direcional circular, Início, Voltar, Menu, mídia e teclado. Atalhos: setas, Enter (OK) e Esc (Voltar),
   que não disparam enquanto você digita em um campo de texto. O Android só aceita ASCII simples ao digitar:
   acentos e `%` são ignorados e o app avisa quais.
-- **Apps:** grade dos apps instalados, com busca, favoritos (estrela), opção de esconder/mostrar apps
-  (botão direito no app) e o rótulo NA TELA no app que está aberto.
+- **Apps:** por padrão mostra só os apps famosos (Netflix, Prime Video, YouTube, Disney+, HBO Max, Spotify,
+  Apple TV, Paramount+ e outros) e os que você mesmo instalou, escondendo os pacotes do sistema. Marque
+  **Mostrar todos os apps** para ver o resto. Tem busca, favoritos (estrela), esconder/mostrar app
+  (botão direito) e o rótulo NA TELA no app que está aberto. Se um app famoso não aparecer, ele pode usar
+  outro nome de pacote: me avise qual é (aparece em Mostrar todos os apps).
 - **Atividade:** tempo por app em primeiro plano no Stick, em Hoje, 7 dias e 30 dias. O histórico é guardado
   só no seu PC (`activity.json`) e começa a contar a partir do primeiro uso. O Stick não informa se a TV está
   desligada, então o tempo pode incluir períodos com a TV apagada.

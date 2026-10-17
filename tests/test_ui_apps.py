@@ -9,6 +9,7 @@ from firetv.ui.apps_tab import AppsTab, AppTile
 
 PM = "pm list packages"
 PACKAGES = "package:com.netflix.ninja\npackage:x.y.z\npackage:a.b.c\n"
+USER_INSTALLED = "package:x.y.z\npackage:a.b.c\n"  # o Netflix vem de fábrica; estes dois foram instalados
 EMPTY_MSG = "Nenhum app encontrado. Conecte ao Stick na aba Ajustes."
 
 
@@ -16,6 +17,7 @@ EMPTY_MSG = "Nenhum app encontrado. Conecte ao Stick na aba Ajustes."
 def env():
     conn = FakeConnection()
     conn.responses[PM] = PACKAGES
+    conn.responses["pm list packages -3"] = USER_INSTALLED
     session = Session(lambda: conn, sleep=lambda s: None)
     session.connect("192.168.0.10")
     return conn, session
@@ -114,6 +116,7 @@ def test_tile_click_launches_package(qtbot, env):
 def test_refreshes_when_session_connects(qtbot):
     conn = FakeConnection()
     conn.responses[PM] = PACKAGES
+    conn.responses["pm list packages -3"] = USER_INSTALLED
     session = Session(lambda: conn, sleep=lambda s: None)
     tab = AppsTab(session, AppConfig())
     qtbot.addWidget(tab)
@@ -125,10 +128,10 @@ def test_refreshes_when_session_connects(qtbot):
 NETFLIX = "com.netflix.ninja"
 
 
-def test_search_placeholder_shows_total_of_loaded_apps(qtbot, env):
+def test_search_placeholder_shows_how_many_apps_are_listed(qtbot, env):
     _, session = env
     tab = make_tab(qtbot, session, AppConfig(hidden=["x.y.z"]), expected_tiles=2)
-    assert tab.search_edit.placeholderText() == "Buscar nos 3 apps"  # conta os escondidos também
+    assert tab.search_edit.placeholderText() == "Buscar nos 2 apps"  # só o que está à mostra
 
 
 def test_search_placeholder_without_apps(qtbot):
@@ -211,3 +214,65 @@ def test_grid_never_scrolls_horizontally(qtbot, env):
     tab = make_tab(qtbot, session, AppConfig(), expected_tiles=3)
     area = tab.findChild(QScrollArea)
     assert area.horizontalScrollBarPolicy() == Qt.ScrollBarAlwaysOff
+
+
+SYSTEM_PACKAGES = PACKAGES + "package:android\npackage:amazon.fireos\npackage:com.amazon.tv.settings\n"
+HINT = 'Nenhum app popular encontrado. Marque "Mostrar todos os apps" para ver o resto.'
+
+
+def test_default_view_lists_only_popular_and_user_installed_apps(qtbot, env):
+    conn, session = env
+    conn.responses[PM] = SYSTEM_PACKAGES
+    tab = make_tab(qtbot, session, AppConfig(), expected_tiles=3)
+    assert names(tab) == ["a.b.c", "Netflix", "x.y.z"]
+
+
+def test_show_all_reveals_system_packages_too(qtbot, env):
+    conn, session = env
+    conn.responses[PM] = SYSTEM_PACKAGES
+    tab = make_tab(qtbot, session, AppConfig(), expected_tiles=3)
+    tab.show_hidden_check.setChecked(True)
+    assert len(tab.tiles()) == 6 and "android" in names(tab)
+    tab.show_hidden_check.setChecked(False)
+    assert len(tab.tiles()) == 3
+
+
+def test_checkbox_label_says_all_apps(qtbot, env):
+    _, session = env
+    assert "todos os apps" in make_tab(qtbot, session, AppConfig()).show_hidden_check.text().lower()
+
+
+def test_prime_video_hbo_and_spotify_show_up_with_their_real_names(qtbot, env):
+    conn, session = env
+    conn.responses[PM] = (
+        "package:com.amazon.firebat\npackage:com.hbo.hbonow\npackage:com.spotify.tv.android\n"
+        "package:android\n"
+    )
+    conn.responses["pm list packages -3"] = ""
+    tab = make_tab(qtbot, session, AppConfig(), expected_tiles=3)
+    assert names(tab) == ["HBO Max", "Prime Video", "Spotify"]
+
+
+def test_placeholder_counts_only_what_is_listed_by_default(qtbot, env):
+    conn, session = env
+    conn.responses[PM] = SYSTEM_PACKAGES
+    tab = make_tab(qtbot, session, AppConfig(), expected_tiles=3)
+    assert tab.search_edit.placeholderText() == "Buscar nos 3 apps"
+    tab.show_hidden_check.setChecked(True)
+    assert tab.search_edit.placeholderText() == "Buscar nos 6 apps"
+
+
+def test_hint_when_only_system_apps_are_installed(qtbot, env):
+    conn, session = env
+    conn.responses[PM] = "package:android\npackage:amazon.fireos\n"
+    conn.responses["pm list packages -3"] = ""
+    tab = make_tab(qtbot, session, AppConfig())
+    qtbot.waitUntil(lambda: tab.empty_label.text() == HINT, timeout=3000)
+    assert tab.tiles() == []
+
+
+def test_search_without_results_keeps_the_short_message(qtbot, env):
+    _, session = env
+    tab = make_tab(qtbot, session, AppConfig(), expected_tiles=3)
+    tab.search_edit.setText("zzzz")
+    assert tab.empty_label.text() == "Nenhum app encontrado." and not tab.empty_label.isHidden()

@@ -95,3 +95,76 @@ def test_launch_rejects_unsafe_package_names(conn, ruim):
     with pytest.raises(ValueError):
         Controller(conn).launch(ruim)
     assert conn.commands == []
+
+
+import pytest as _pytest  # noqa: E402
+
+from firetv.apps import KNOWN_APPS  # noqa: E402
+
+
+@_pytest.mark.parametrize(
+    "package, name",
+    [
+        ("com.amazon.firebat", "Prime Video"),
+        ("com.amazon.avod", "Prime Video"),
+        ("com.amazon.avod.thirdpartyclient", "Prime Video"),
+        ("com.amazon.amazonvideo.livingroom", "Prime Video"),
+        ("com.hbo.hbonow", "HBO Max"),
+        ("com.wbd.stream", "HBO Max"),
+        ("com.spotify.tv.android", "Spotify"),
+        ("com.amazon.firetv.youtube", "YouTube"),
+        ("com.google.android.youtube.tv", "YouTube"),
+        ("com.netflix.ninja", "Netflix"),
+        ("com.disney.disneyplus", "Disney+"),
+        ("com.apple.atve.amazon.appletv", "Apple TV"),
+        ("com.cbs.ott", "Paramount+"),
+        ("tv.pluto.android", "Pluto TV"),
+        ("tv.twitch.android.viewer", "Twitch"),
+    ],
+)
+def test_known_apps_table_has_the_real_fire_tv_packages(package, name):
+    assert KNOWN_APPS[package][0] == name
+
+
+def test_duplicate_known_apps_keep_only_the_first_listed():
+    entries = build_entries(["com.amazon.avod", "com.amazon.firebat"], AppConfig())
+    assert [e.package for e in entries] == ["com.amazon.firebat"]
+
+
+def test_featured_is_known_or_user_installed():
+    entries = build_entries(
+        ["com.netflix.ninja", "x.y.z", "android"], AppConfig(), third_party={"x.y.z"}
+    )
+    featured = {e.package: e.featured for e in entries}
+    assert featured == {"com.netflix.ninja": True, "x.y.z": True, "android": False}
+
+
+def test_everything_is_featured_when_the_user_installed_list_is_unknown():
+    entries = build_entries(["x.y.z", "android"], AppConfig())
+    assert all(e.featured for e in entries)
+
+
+def test_list_apps_marks_system_packages_as_not_featured(conn):
+    conn.responses[PM] = "package:com.netflix.ninja\npackage:android\npackage:x.y.z\n"
+    conn.responses["pm list packages -3"] = "package:x.y.z\n"
+    entries = {e.package: e.featured for e in Controller(conn).list_apps(AppConfig())}
+    assert entries == {"com.netflix.ninja": True, "android": False, "x.y.z": True}
+
+
+def test_list_apps_without_user_installed_output_features_only_known_apps(conn):
+    conn.responses[PM] = "package:com.netflix.ninja\npackage:android\n"
+    entries = {e.package: e.featured for e in Controller(conn).list_apps(AppConfig())}
+    assert entries == {"com.netflix.ninja": True, "android": False}
+
+
+def test_launch_retries_with_the_leanback_category_when_no_activity_is_found(conn):
+    first = "monkey -p com.amazon.firebat -c android.intent.category.LAUNCHER 1"
+    second = "monkey -p com.amazon.firebat -c android.intent.category.LEANBACK_LAUNCHER 1"
+    conn.responses[first] = "** No activities found to run, monkey aborted."
+    Controller(conn).launch("com.amazon.firebat")
+    assert conn.commands[-2:] == [first, second]
+
+
+def test_launch_does_not_retry_when_the_first_attempt_works(conn):
+    Controller(conn).launch("com.netflix.ninja")
+    assert len(conn.commands) == 1

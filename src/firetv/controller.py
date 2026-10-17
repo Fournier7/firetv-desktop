@@ -52,13 +52,16 @@ class Controller:
 
     def list_apps(self, cfg: AppConfig, show_hidden: bool = False) -> list[AppEntry]:
         packages = parse_packages(self.conn.shell("pm list packages"))
-        entries = build_entries(packages, cfg)
+        user_installed = set(parse_packages(self.conn.shell("pm list packages -3")))
+        entries = build_entries(packages, cfg, third_party=user_installed)
         return entries if show_hidden else [e for e in entries if not e.hidden]
 
     def launch(self, package: str) -> None:
         if not _PACKAGE_RE.fullmatch(package):
             raise ValueError(f"nome de pacote inválido: {package!r}")
-        self.conn.shell(f"monkey -p {package} -c android.intent.category.LAUNCHER 1")
+        output = self.conn.shell(f"monkey -p {package} -c android.intent.category.LAUNCHER 1")
+        if "no activities found" in output.lower():  # apps só de TV usam outra categoria
+            self.conn.shell(f"monkey -p {package} -c android.intent.category.LEANBACK_LAUNCHER 1")
 
     def current_app(self) -> str | None:
         return parse_focus(self.conn.shell("dumpsys window | grep mCurrentFocus"))

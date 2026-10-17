@@ -27,6 +27,7 @@ from firetv.ui.worker import get_bridge, run_in_background
 
 EMPTY_MESSAGE = "Nenhum app encontrado. Conecte ao Stick na aba Ajustes."
 NO_RESULTS_MESSAGE = "Nenhum app encontrado."
+NO_POPULAR_MESSAGE = 'Nenhum app popular encontrado. Marque "Mostrar todos os apps" para ver o resto.'
 MSG_LOST = "Sem conexão com o Stick. Conecte na aba Ajustes."
 ON_SCREEN = "NA TELA"
 COLUMNS = 3
@@ -153,7 +154,7 @@ class AppsTab(QWidget):
 
         self.search_edit = QLineEdit()
         self.search_edit.addAction(icon("search", theme.MUTED), QLineEdit.LeadingPosition)
-        self.show_hidden_check = QCheckBox("Mostrar apps escondidos")
+        self.show_hidden_check = QCheckBox("Mostrar todos os apps (sistema e escondidos)")
         self.empty_label = QLabel(EMPTY_MESSAGE)
         self.empty_label.setObjectName("help")
         self.empty_label.setWordWrap(True)
@@ -251,12 +252,13 @@ class AppsTab(QWidget):
             item = self._grid.takeAt(0)
             if item.widget() is not None:
                 item.widget().deleteLater()
-        total = len(self._entries)
-        self.search_edit.setPlaceholderText(f"Buscar nos {total} apps" if total else "Buscar apps")
         visible = self._entries
         if not self.show_hidden_check.isChecked():
-            visible = [e for e in visible if not e.hidden]
-        visible = search(visible, self.search_edit.text())
+            visible = [e for e in visible if e.featured and not e.hidden]
+        count = len(visible)
+        self.search_edit.setPlaceholderText(f"Buscar nos {count} apps" if count else "Buscar apps")
+        query = self.search_edit.text()
+        visible = search(visible, query)
         for index, entry in enumerate(visible):
             tile = AppTile(entry)
             tile.set_on_screen(entry.package == self._current)
@@ -267,5 +269,11 @@ class AppsTab(QWidget):
         if visible:
             self.empty_label.hide()
         else:
-            self.empty_label.setText(EMPTY_MESSAGE if not self._entries else NO_RESULTS_MESSAGE)
+            if not self._entries:
+                message = EMPTY_MESSAGE
+            elif query.strip():
+                message = NO_RESULTS_MESSAGE
+            else:
+                message = NO_POPULAR_MESSAGE
+            self.empty_label.setText(message)
             self.empty_label.show()
