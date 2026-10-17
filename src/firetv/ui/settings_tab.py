@@ -27,6 +27,7 @@ STATUS_TEXT = {
 
 class SettingsTab(QWidget):
     name_changed = Signal(str)
+    connected = Signal(str)  # IP conectado com sucesso
     volume_method_changed = Signal()
     dialog_active = Signal(bool)  # o diálogo de diagnóstico está aberto?
 
@@ -108,6 +109,7 @@ class SettingsTab(QWidget):
         self.connect_button.setEnabled(True)
         self._cfg.host = host
         save_config(self._cfg)
+        self.connected.emit(host)
 
     def _on_connect_error(self, exc: Exception) -> None:
         self.connect_button.setEnabled(True)

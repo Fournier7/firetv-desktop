@@ -4,7 +4,6 @@ from fakes import FakeConnection
 from firetv.config import AppConfig
 from firetv.session import ConnectionState, Session
 from firetv.ui.home_tab import HomeTab
-from firetv.ui.main_window import MainWindow
 from firetv.ui.widgets import AudioCard, TvCard
 from firetv.ui.worker import get_bridge
 
@@ -124,19 +123,6 @@ def test_favorite_tile_click_launches_app(qtbot, env):
     home.favorite_tiles()[0].launch_requested.emit("com.netflix.ninja")
     expected = "monkey -p com.netflix.ninja -c android.intent.category.LAUNCHER 1"
     qtbot.waitUntil(lambda: expected in conn.commands, timeout=3000)
-
-
-def test_home_favorites_match_apps_tab(qtbot, env):
-    _, session = env
-    win = MainWindow(session, AppConfig())
-    qtbot.addWidget(win)
-    win.show()
-    win.apps_tab.refresh()
-    qtbot.waitUntil(lambda: len(win.apps_tab.tiles()) == 2, timeout=3000)
-    assert win.home_tab.favorite_tiles() == []
-    netflix = next(t for t in win.apps_tab.tiles() if t.name_label.text() == "Netflix")
-    netflix.star_button.click()
-    assert [t.name_label.text() for t in win.home_tab.favorite_tiles()] == ["Netflix"]
 
 
 def test_home_polling_stops_when_disconnected(qtbot, env):

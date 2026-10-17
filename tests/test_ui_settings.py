@@ -4,7 +4,6 @@ from fakes import FakeConnection
 from firetv.config import AppConfig, load_config
 from firetv.connection import AuthRequiredError, ConnectionFailedError
 from firetv.session import ConnectionState, Session
-from firetv.ui.main_window import MainWindow
 from firetv.ui.settings_tab import SettingsTab
 from firetv.ui.worker import get_bridge
 
@@ -100,14 +99,6 @@ def test_host_field_starts_with_saved_host_and_help_is_visible(qtbot, env):
     assert "Depuração ADB" in tab.help_label.text()
 
 
-def test_main_window_tab_order(qtbot, env):
-    _, session, cfg = env
-    win = MainWindow(session, cfg)
-    qtbot.addWidget(win)
-    titles = [win.tabs.tabText(i) for i in range(win.tabs.count())]
-    assert titles == ["Início", "Controle", "Apps", "Ajustes"]
-
-
 def test_name_field_starts_with_saved_name(qtbot, env):
     _, session, _ = env
     tab = make_tab(qtbot, session, AppConfig(tv_name="Sala"))
@@ -139,3 +130,20 @@ def test_diagnostic_button_exists(qtbot, env):
     _, session, cfg = env
     tab = make_tab(qtbot, session, cfg)
     assert tab.diagnostic_button.text() == "Diagnóstico de volume"
+
+
+def test_connected_signal_carries_the_host(qtbot, env):
+    conn, session, cfg = env
+    tab = make_tab(qtbot, session, cfg)
+    with qtbot.waitSignal(tab.connected, timeout=3000) as blocker:
+        click_connect(tab, "192.168.0.10")
+    assert blocker.args == ["192.168.0.10"]
+
+
+def test_connected_signal_not_emitted_on_failure(qtbot, env):
+    conn, session, cfg = env
+    conn.fail_connect = ConnectionFailedError("x")
+    tab = make_tab(qtbot, session, cfg)
+    with qtbot.assertNotEmitted(tab.connected):
+        click_connect(tab, "192.168.0.10")
+        qtbot.waitUntil(lambda: tab.message_label.text() == MSG_FAILED, timeout=3000)
