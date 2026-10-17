@@ -10,8 +10,14 @@ from firetv.connection import Connection
 from firetv.keys import KeyCode
 from firetv.text import prepare_text
 
+_FOCUS_RE = re.compile(r"mCurrentFocus=.*?([A-Za-z0-9_.]+)/[A-Za-z0-9_.$]+\}")
 _PACKAGE_RE = re.compile(r"[A-Za-z0-9._]+")
 _VOLUME_KEYS = (KeyCode.VOLUME_UP, KeyCode.VOLUME_DOWN, KeyCode.MUTE)
+
+
+def parse_focus(output: str) -> str | None:
+    match = _FOCUS_RE.search(output)
+    return match.group(1) if match else None
 
 
 @dataclass
@@ -49,3 +55,6 @@ class Controller:
         if not _PACKAGE_RE.fullmatch(package):
             raise ValueError(f"nome de pacote inválido: {package!r}")
         self.conn.shell(f"monkey -p {package} -c android.intent.category.LAUNCHER 1")
+
+    def current_app(self) -> str | None:
+        return parse_focus(self.conn.shell("dumpsys window | grep mCurrentFocus"))
