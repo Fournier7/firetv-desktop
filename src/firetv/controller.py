@@ -1,12 +1,16 @@
 """Controle: ações de alto nível sobre uma Connection."""
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
+from firetv.apps import AppEntry, build_entries, parse_packages
+from firetv.config import AppConfig
 from firetv.connection import Connection
 from firetv.keys import KeyCode
 from firetv.text import prepare_text
 
+_PACKAGE_RE = re.compile(r"[A-Za-z0-9._]+")
 _VOLUME_KEYS = (KeyCode.VOLUME_UP, KeyCode.VOLUME_DOWN, KeyCode.MUTE)
 
 
@@ -35,3 +39,13 @@ class Controller:
             raise ValueError(f"{key!r} não é uma tecla de volume")
         output = self.conn.shell(f"input keyevent {int(key)}").lower()
         return "error" not in output and "exception" not in output
+
+    def list_apps(self, cfg: AppConfig, show_hidden: bool = False) -> list[AppEntry]:
+        packages = parse_packages(self.conn.shell("pm list packages"))
+        entries = build_entries(packages, cfg)
+        return entries if show_hidden else [e for e in entries if not e.hidden]
+
+    def launch(self, package: str) -> None:
+        if not _PACKAGE_RE.fullmatch(package):
+            raise ValueError(f"nome de pacote inválido: {package!r}")
+        self.conn.shell(f"monkey -p {package} -c android.intent.category.LAUNCHER 1")
