@@ -109,3 +109,17 @@ def test_run_serializes_concurrent_operations(setup):
     for t in threads:
         t.join()
     assert overlaps == 0
+
+
+def test_failed_connect_after_connected_marks_session_disconnected(setup):
+    conn, session, _ = setup
+    session.connect("192.168.0.10")
+    seen = []
+    session.on_state_change = seen.append
+    conn.fail_connect = ConnectionFailedError("ip errado")
+    with pytest.raises(ConnectionFailedError):
+        session.connect("10.9.9.9")
+    assert session.state is ConnectionState.DISCONNECTED
+    assert seen == [ConnectionState.DISCONNECTED]
+    with pytest.raises(ConnectionLostError):  # não reconecta ao IP antigo em silêncio
+        session.run(lambda c: c.current_app())

@@ -48,7 +48,13 @@ class Session:
 
     def connect(self, host: str) -> None:
         with self._lock:
-            self._conn.connect(host)
+            try:
+                self._conn.connect(host)
+            except FireTvError:
+                # a conexão antiga já foi fechada; não finge que continua conectado
+                self._host = None
+                self._set_state(ConnectionState.DISCONNECTED)
+                raise
             self._host = host
             self._set_state(ConnectionState.CONNECTED)
 

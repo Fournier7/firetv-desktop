@@ -26,6 +26,7 @@ def make_device_class(connect_exc=None, shell_exc=None, output="ok"):
             if connect_exc:
                 raise connect_exc
             self.rsa_keys = rsa_keys
+            self.auth_timeout_s = auth_timeout_s
             self.available = True
 
         def shell(self, command, **kwargs):
@@ -108,3 +109,10 @@ def test_disconnect_closes_device(monkeypatch):
     c.connect("192.168.0.10")
     c.disconnect()
     assert cls.instances[0].closed and not c.is_connected()
+
+
+def test_connect_gives_time_to_accept_the_authorization_prompt(monkeypatch):
+    cls = make_device_class()
+    monkeypatch.setattr(connection, "AdbDeviceTcp", cls)
+    AdbConnection().connect("192.168.0.10")
+    assert cls.instances[0].auth_timeout_s == 30.0

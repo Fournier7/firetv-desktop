@@ -16,6 +16,7 @@ class FakeConnection:
 
     def connect(self, host: str, port: int = 5555) -> None:
         self.connect_calls += 1
+        self.connected = False  # como AdbConnection: fecha a conexão antiga antes de abrir outra
         if self.fail_connect is not None:
             raise self.fail_connect
         self.host = host

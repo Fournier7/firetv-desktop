@@ -16,6 +16,7 @@ from adb_shell.exceptions import (
 from firetv.config import config_dir
 
 CONNECT_TIMEOUT_SECONDS = 5.0
+AUTH_TIMEOUT_SECONDS = 30.0  # tempo para aceitar o pedido de autorização na TV
 _NETWORK_ERRORS = (OSError, TcpTimeoutException, AdbConnectionError, AdbTimeoutError)
 
 
@@ -63,7 +64,7 @@ class AdbConnection:
         self.disconnect()
         device = AdbDeviceTcp(host, port, default_transport_timeout_s=CONNECT_TIMEOUT_SECONDS)
         try:
-            device.connect(rsa_keys=[_load_signer()], auth_timeout_s=CONNECT_TIMEOUT_SECONDS)
+            device.connect(rsa_keys=[_load_signer()], auth_timeout_s=AUTH_TIMEOUT_SECONDS)
         except DeviceAuthError as exc:
             raise AuthRequiredError(str(exc)) from exc
         except _NETWORK_ERRORS as exc:
