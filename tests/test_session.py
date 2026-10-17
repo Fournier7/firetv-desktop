@@ -81,3 +81,31 @@ def test_run_without_ever_connecting_raises_without_waiting(setup):
     with pytest.raises(ConnectionLostError):
         session.run(lambda c: c.current_app())
     assert sleeps == [] and session.state is ConnectionState.DISCONNECTED
+
+
+def test_run_serializes_concurrent_operations(setup):
+    import threading
+    import time
+
+    _, session, _ = setup
+    session.connect("192.168.0.10")
+    active = 0
+    overlaps = 0
+    guard = threading.Lock()
+
+    def op(_controller):
+        nonlocal active, overlaps
+        with guard:
+            active += 1
+            if active > 1:
+                overlaps += 1
+        time.sleep(0.05)
+        with guard:
+            active -= 1
+
+    threads = [threading.Thread(target=session.run, args=(op,)) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert overlaps == 0

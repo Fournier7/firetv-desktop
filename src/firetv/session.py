@@ -1,6 +1,7 @@
 """Sessão: estado da conexão e reconexão automática."""
 from __future__ import annotations
 
+import threading
 import time
 from enum import Enum
 from typing import Callable, TypeVar
@@ -30,6 +31,7 @@ class Session:
         self._sleep = sleep
         self._host: str | None = None
         self._state = ConnectionState.DISCONNECTED
+        self._lock = threading.RLock()  # um comando por vez na conexão ADB
         self.controller = Controller(self._conn)
         self.on_state_change: Callable[[ConnectionState], None] | None = None
 
@@ -45,20 +47,22 @@ class Session:
             self.on_state_change(state)
 
     def connect(self, host: str) -> None:
-        self._conn.connect(host)
-        self._host = host
-        self._set_state(ConnectionState.CONNECTED)
+        with self._lock:
+            self._conn.connect(host)
+            self._host = host
+            self._set_state(ConnectionState.CONNECTED)
 
     def run(self, op: Callable[[Controller], T]) -> T:
-        try:
-            return op(self.controller)
-        except ConnectionLostError:
-            self._reconnect()
-        try:
-            return op(self.controller)
-        except ConnectionLostError:
-            self._set_state(ConnectionState.DISCONNECTED)
-            raise
+        with self._lock:
+            try:
+                return op(self.controller)
+            except ConnectionLostError:
+                self._reconnect()
+            try:
+                return op(self.controller)
+            except ConnectionLostError:
+                self._set_state(ConnectionState.DISCONNECTED)
+                raise
 
     def _reconnect(self) -> None:
         if self._host is None:
