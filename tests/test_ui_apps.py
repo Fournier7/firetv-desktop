@@ -177,3 +177,12 @@ def test_tile_star_reflects_favorite(qtbot):
     tile = AppTile(entry)
     qtbot.addWidget(tile)
     assert tile.star_button.isChecked() and tile.badge_label.isHidden()
+
+
+def test_compact_tile_is_smaller(qtbot):
+    entry = AppEntry(package=NETFLIX, name="Netflix", color="#E50914", favorite=False, hidden=False)
+    normal, compact = AppTile(entry), AppTile(entry, show_star=False, compact=True)
+    qtbot.addWidget(normal)
+    qtbot.addWidget(compact)
+    assert compact.width() < normal.width() and compact.height() < normal.height()
+    assert compact.width() * 4 + 3 * 8 <= 340  # 4 tiles cabem na largura útil do painel

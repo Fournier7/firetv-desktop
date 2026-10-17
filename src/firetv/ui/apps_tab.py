@@ -43,12 +43,12 @@ class AppTile(QFrame):
     favorite_requested = Signal(str)
     hidden_requested = Signal(str)
 
-    def __init__(self, entry: AppEntry, show_star: bool = True) -> None:
+    def __init__(self, entry: AppEntry, show_star: bool = True, compact: bool = False) -> None:
         super().__init__()
         self.entry = entry
         self.setObjectName("tile")
         self.setCursor(Qt.PointingHandCursor)
-        self.setFixedSize(108, 128)
+        self.setFixedSize(*((76, 92) if compact else (108, 128)))
         self._apply_style(on_screen=False)
 
         self.badge_label = QLabel(ON_SCREEN)
@@ -76,14 +76,17 @@ class AppTile(QFrame):
 
         self.mark = QLabel(initials(entry.name))
         self.mark.setAlignment(Qt.AlignCenter)
-        self.mark.setFixedSize(52, 52)
+        mark_size = 36 if compact else 52
+        self.mark.setFixedSize(mark_size, mark_size)
         self.mark.setStyleSheet(
             f"background: {entry.color}; color: white; border-radius: 12px; font-weight: bold;"
         )
         self.name_label = QLabel(entry.name)
         self.name_label.setAlignment(Qt.AlignCenter)
         self.name_label.setWordWrap(True)
-        self.name_label.setStyleSheet("background: transparent;")
+        self.name_label.setStyleSheet(
+            f"background: transparent; font-size: {'11px' if compact else '14px'};"
+        )
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(6, 4, 6, 6)

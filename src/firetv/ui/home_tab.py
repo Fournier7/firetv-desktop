@@ -1,38 +1,52 @@
-"""Aba Início: app em execução na TV e faixa de favoritos."""
+"""Aba Início: app em execução, volume e favoritos."""
 from __future__ import annotations
 
-from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
+from PySide6.QtCore import QTimer, Signal
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from firetv.apps import KNOWN_APPS, build_entries
 from firetv.config import AppConfig
 from firetv.session import POLL_INTERVAL_SECONDS, ConnectionState, Session
 from firetv.ui.apps_tab import AppTile
+from firetv.ui.theme import accent_for
+from firetv.ui.widgets import AudioCard, Card, TvCard
 from firetv.ui.worker import get_bridge, run_in_background
 
-NO_APP = "Nenhum app em primeiro plano"
+MAX_FAVORITES = 4
+NO_FAVORITES = "Marque apps com a estrela na aba Apps."
 
 
 class HomeTab(QWidget):
+    see_all_requested = Signal()
+    polled = Signal(object)  # pacote em primeiro plano, ou None
+
     def __init__(self, session: Session, cfg: AppConfig) -> None:
         super().__init__()
         self._session = session
         self._cfg = cfg
         self._polling = False
 
-        title = QLabel("EM EXECUÇÃO NA TV")
-        title.setObjectName("help")
-        self.current_app_label = QLabel(NO_APP)
-        self.current_app_label.setStyleSheet("font-size: 22px; font-weight: bold;")
-        favorites_title = QLabel("Favoritos")
-        favorites_title.setObjectName("help")
+        self.tv_card = TvCard()
+        self.audio_card = AudioCard(session, cfg)
+
+        self.see_all_button = QPushButton("Ver todos")
+        self.see_all_button.setFlat(True)
+        self.see_all_button.clicked.connect(self.see_all_requested)
+        self.favorites_empty_label = QLabel(NO_FAVORITES)
+        self.favorites_empty_label.setObjectName("help")
+        self.favorites_empty_label.setWordWrap(True)
         self._strip = QHBoxLayout()
+        self._strip.setSpacing(8)
+
+        favorites = Card("Favoritos")
+        favorites.body.addWidget(self.see_all_button)
+        favorites.body.addLayout(self._strip)
+        favorites.body.addWidget(self.favorites_empty_label)
 
         layout = QVBoxLayout(self)
-        layout.addWidget(title)
-        layout.addWidget(self.current_app_label)
-        layout.addWidget(favorites_title)
-        layout.addLayout(self._strip)
+        layout.addWidget(self.tv_card)
+        layout.addWidget(self.audio_card)
+        layout.addWidget(favorites)
         layout.addStretch(1)
 
         self.timer = QTimer(self)
@@ -69,10 +83,9 @@ class HomeTab(QWidget):
 
     def _on_current_app(self, package: str | None) -> None:
         self._finish_poll()
-        if package is None:
-            self.current_app_label.setText(NO_APP)
-        else:
-            self.current_app_label.setText(KNOWN_APPS.get(package, (package, ""))[0])
+        name = None if package is None else KNOWN_APPS.get(package, (package, ""))[0]
+        self.tv_card.set_app(name, accent_for(package))
+        self.polled.emit(package)
 
     # --- favoritos ---
     def favorite_tiles(self) -> list[AppTile]:
@@ -87,11 +100,15 @@ class HomeTab(QWidget):
             item = self._strip.takeAt(0)
             if item.widget() is not None:
                 item.widget().deleteLater()
-        for entry in build_entries(self._cfg.favorites, self._cfg):
-            tile = AppTile(entry)
+        entries = build_entries(self._cfg.favorites, self._cfg)
+        by_package = {e.package: e for e in entries}
+        shown = [by_package[p] for p in self._cfg.favorites[:MAX_FAVORITES] if p in by_package]
+        for entry in shown:
+            tile = AppTile(entry, show_star=False, compact=True)
             tile.launch_requested.connect(self._launch)
             self._strip.addWidget(tile)
         self._strip.addStretch(1)
+        self.favorites_empty_label.setHidden(bool(shown))
 
     def _launch(self, package: str) -> None:
         run_in_background(
