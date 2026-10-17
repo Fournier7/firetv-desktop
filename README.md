@@ -7,6 +7,8 @@
 ![Windows](https://img.shields.io/badge/plataforma-Windows-0078D6)
 ![MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-green)
 
+> Projeto pessoal e independente, **sem qualquer vínculo com a Amazon**. Veja o [aviso](#aviso).
+
 <p align="center">
   <img src="docs/screenshots/home.png" width="230" alt="Tela Início">
   <img src="docs/screenshots/remote.png" width="230" alt="Tela Controle">
@@ -133,6 +135,15 @@ Com o PC no cabo e o Stick no wifi:
 - Mostrar o quadro de TV grande na tela Início.
 - Publicar o `.exe` como Release no GitHub.
 
+## Aviso
+
+Este é um **projeto pessoal e independente**, feito para uso próprio e como exercício de programação. **Não tem qualquer vínculo, patrocínio ou aprovação da Amazon**, nem de nenhuma das marcas citadas.
+
+"Amazon", "Fire TV", "Fire TV Stick" e "Prime Video" são marcas da Amazon.com, Inc. ou de suas afiliadas. Netflix, YouTube, Disney+, HBO Max, Spotify, Apple TV, Paramount+, Pluto TV e Twitch pertencem aos seus respectivos donos. Os nomes aparecem apenas para identificar os aplicativos instalados no aparelho, e o projeto não usa logos oficiais.
+
+O app controla o seu próprio aparelho pela depuração ADB, um recurso de desenvolvedor que o próprio Stick oferece, e só em aparelhos e redes que sejam seus. O software é fornecido "como está", sem garantias (veja a licença).
+
 ## Licença
 
 [MIT](LICENSE) © 2026 Willian Fournier Pereira
+
