@@ -106,3 +106,36 @@ def test_main_window_tab_order(qtbot, env):
     qtbot.addWidget(win)
     titles = [win.tabs.tabText(i) for i in range(win.tabs.count())]
     assert titles == ["Início", "Controle", "Apps", "Ajustes"]
+
+
+def test_name_field_starts_with_saved_name(qtbot, env):
+    _, session, _ = env
+    tab = make_tab(qtbot, session, AppConfig(tv_name="Sala"))
+    assert tab.name_edit.text() == "Sala"
+
+
+def test_name_is_saved_and_signalled(qtbot, env):
+    _, session, cfg = env
+    tab = make_tab(qtbot, session, cfg)
+    with qtbot.waitSignal(tab.name_changed, timeout=1000) as blocker:
+        tab.name_edit.setText("  Sala  ")
+        tab.name_edit.editingFinished.emit()
+    assert blocker.args == ["Sala"]
+    assert cfg.tv_name == "Sala" and load_config().tv_name == "Sala"
+
+
+def test_blank_name_goes_back_to_default(qtbot, env):
+    _, session, cfg = env
+    cfg.tv_name = "Sala"
+    tab = make_tab(qtbot, session, cfg)
+    with qtbot.waitSignal(tab.name_changed, timeout=1000) as blocker:
+        tab.name_edit.setText("   ")
+        tab.name_edit.editingFinished.emit()
+    assert blocker.args == ["Fire TV"] and tab.name_edit.text() == "Fire TV"
+    assert cfg.tv_name == "Fire TV"
+
+
+def test_diagnostic_button_exists(qtbot, env):
+    _, session, cfg = env
+    tab = make_tab(qtbot, session, cfg)
+    assert tab.diagnostic_button.text() == "Diagnóstico de volume"
