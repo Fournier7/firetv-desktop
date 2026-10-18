@@ -7,7 +7,7 @@
 ![Windows](https://img.shields.io/badge/plataforma-Windows-0078D6)
 ![MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-green)
 
-> Projeto pessoal e independente, **sem qualquer vínculo com a Amazon**. Veja o [aviso](#aviso).
+> **Projeto pessoal de estudo e prática de programação**, feito para uso próprio e **sem qualquer vínculo com a Amazon**. Veja o [aviso](#aviso).
 
 <p align="center">
   <img src="docs/screenshots/home.png" width="230" alt="Tela Início">
@@ -21,7 +21,7 @@
 
 ## Por que existe
 
-Já existem apps de celular para controlar a Fire TV, mas não uma versão leve para o computador. Este projeto leva essa ideia para a bandeja do Windows: um clique no ícone abre o painel, e você controla a TV sem pegar o controle remoto nem o celular.
+Este projeto nasceu como **estudo e treinamento prático de programação**. Eu queria praticar Python, interface gráfica (PySide6), comunicação em rede (ADB), testes automatizados e empacotamento, e escolhi um problema real do meu dia a dia: controlar a minha Fire TV pelo computador, sem pegar o controle remoto nem o celular. A ideia é a de um painel na bandeja do Windows, que abre com um clique no ícone.
 
 ## Funcionalidades
 
@@ -137,13 +137,11 @@ Com o PC no cabo e o Stick no wifi:
 
 ## Aviso
 
-Este é um **projeto pessoal e independente**, feito para uso próprio e como exercício de programação. **Não tem qualquer vínculo, patrocínio ou aprovação da Amazon**, nem de nenhuma das marcas citadas.
-
-"Amazon", "Fire TV", "Fire TV Stick" e "Prime Video" são marcas da Amazon.com, Inc. ou de suas afiliadas. Netflix, YouTube, Disney+, HBO Max, Spotify, Apple TV, Paramount+, Pluto TV e Twitch pertencem aos seus respectivos donos. Os nomes aparecem apenas para identificar os aplicativos instalados no aparelho, e o projeto não usa logos oficiais.
+Este é um **projeto pessoal e independente**, criado para **uso próprio** e como **estudo e treinamento prático de programação**. Não é um produto comercial e não é oferecido como serviço. **Não tem qualquer vínculo, patrocínio ou aprovação da Amazon**, nem de nenhuma das marcas citadas.
 
 O app controla o seu próprio aparelho pela depuração ADB, um recurso de desenvolvedor que o próprio Stick oferece, e só em aparelhos e redes que sejam seus. O software é fornecido "como está", sem garantias (veja a licença).
 
 ## Licença
 
-[MIT](LICENSE) © 2026 Willian Fournier Pereira
+[MIT](LICENSE) © 2026 Willian Fournier
 
