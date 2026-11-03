@@ -37,6 +37,12 @@ A tela Início reúne controle remoto e teclado à esquerda, com aplicativo atua
 
 Os botões de volume começam desativados até o diagnóstico confirmar um método compatível. Clique em Configurar volume e confirme na TV se o comando funcionou.
 
+O aplicativo em execução aparece dentro de uma TV ilustrada, com transição ao trocar de app. Os favoritos têm animações ao passar o mouse e clicar. Em janela estreita, a TV e os favoritos aparecem antes do controle.
+
+Na aba Apps, **Na minha TV** lista os instalados e **Descobrir streamings** mostra sugestões que ainda não estão no aparelho, como HBO Max, Globoplay, Paramount+ e Apple TV. Clicar numa sugestão mostra o nome para procurar na loja da TV; não instala nem assina serviços automaticamente. Componentes internos ficam em Mostrar todos os apps.
+
+![Sugestões de streaming separadas dos apps instalados](docs/screenshots/apps-discover.png)
+
 O modo antigo continua opcional: execute `FireTVDesktop.exe --tray` ou `python -m firetv.main --tray`. Nesse modo, use o menu da bandeja para sair. Os planos em `docs/planos` registram a evolução da interface.
 
 Outras capturas: [janela estreita](docs/screenshots/desktop-narrow.png), [sem conexão](docs/screenshots/desktop-disconnected.png) e [instalador](docs/screenshots/installer.png). Para recriá-las sem acessar uma TV, rode `python tools/preview_interface.py` no ambiente de desenvolvimento.

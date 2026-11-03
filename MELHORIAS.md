@@ -22,6 +22,11 @@
 - Volume não configurado fica desativado até o usuário confirmar o diagnóstico, acessível no Início.
 - O tema tem melhor contraste, espaçamento, dicas nos botões e indicação visual ao passar o mouse pelo direcional.
 - Consultas antigas do app em primeiro plano são descartadas após uma mudança de conexão.
+- O app atual aparece dentro de uma TV desenhada, com moldura, base e transição suave ao trocar de aplicativo.
+- Favoritos têm brilho e ampliação do ícone ao passar o mouse e resposta visual ao clicar, sem mover os cartões.
+- Na janela estreita, TV e favoritos vêm primeiro.
+- Apps instalados e sugestões de streaming ficam separados. O catálogo reconhece Globoplay, Kick, Downloader, UniTV e Amazon Music, além dos serviços anteriores.
+- Componentes internos deixam de aparecer no destaque. As sugestões não executam instalação, assinatura ou abertura de pacotes ausentes.
 
 O código da versão anterior e o pacote de transferência foram preservados fora desta pasta. Nada foi enviado ao GitHub.
 
@@ -44,7 +49,7 @@ Início automático com o Windows e múltiplas TVs podem vir depois. Para iníci
 
 ## Validação
 
-A suíte automatizada passou com 324 testes no Windows. Cobre os fluxos anteriores e o layout adaptável, os comandos no Início, os avisos de conexão e o volume sem confirmação. As capturas foram conferidas em janela larga, estreita e desconectada, com dados fictícios. Os testes de instância, geometria e instalação continuam passando.
+A suíte automatizada passou com 329 testes no Windows. Cobre os fluxos anteriores e o layout adaptável, os comandos no Início, os avisos de conexão e o volume sem confirmação. As capturas foram conferidas em janela larga, estreita e desconectada, com dados fictícios. Os testes de instância, geometria e instalação continuam passando.
 
 Ambiente usado: Python 3.14.5, PySide6 6.12.0, adb-shell 0.4.4, pytest 9.2.0, pytest-qt 4.5.0 e PyInstaller 6.22.3.
 

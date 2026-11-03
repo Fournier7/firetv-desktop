@@ -26,8 +26,21 @@ KNOWN_APPS: dict[str, tuple[str, str]] = {
     "tv.pluto.android": ("Pluto TV", "#D4A017"),
     "tv.twitch.android.viewer": ("Twitch", "#9146FF"),
     "tv.twitch.android.app": ("Twitch", "#9146FF"),
+    "com.globo.globotv": ("Globoplay", "#F45B39"),
+    "com.kick.mobile": ("Kick", "#53FC18"),
+    "com.esaba.downloader": ("Downloader", "#F59E0B"),
+    "com.global.unitviptv": ("UniTV", "#06B6D4"),
+    "com.amazon.bueller.music": ("Amazon Music", "#25D1DA"),
 }
 _KNOWN_ORDER = {package: index for index, package in enumerate(KNOWN_APPS)}
+STREAMING_NAMES = {
+    "Netflix", "YouTube", "Prime Video", "Disney+", "HBO Max", "Globoplay",
+    "Spotify", "Apple TV", "Paramount+", "Pluto TV", "Twitch", "Kick", "Amazon Music",
+}
+
+
+def is_internal_package(package: str) -> bool:
+    return package == "android" or package.startswith(("com.amazon.", "com.android.", "amazon."))
 
 
 @dataclass
@@ -53,7 +66,7 @@ def build_entries(
     packages: list[str], cfg: AppConfig, third_party: set[str] | None = None
 ) -> list[AppEntry]:
     """Monta as entradas. `third_party` são os pacotes instalados pelo usuário; sem ele
-    (None) não dá para saber o que é do sistema, então tudo conta como em destaque."""
+    (None), preserva os desconhecidos, mas omite componentes internos do destaque."""
     ordered = sorted(dict.fromkeys(packages), key=lambda p: _KNOWN_ORDER.get(p, len(_KNOWN_ORDER)))
     seen_known: set[str] = set()
     entries = []
@@ -71,10 +84,21 @@ def build_entries(
                 color=color,
                 favorite=package in cfg.favorites,
                 hidden=package in cfg.hidden,
-                featured=known or third_party is None or package in third_party,
+                featured=known or (not is_internal_package(package) and
+                                   (third_party is None or package in third_party)),
             )
         )
     return sorted(entries, key=lambda e: e.name.lower())
+
+
+def streaming_suggestions(installed: list[AppEntry]) -> list[AppEntry]:
+    names = {entry.name for entry in installed}
+    suggestions = []
+    for package, (name, color) in KNOWN_APPS.items():
+        if name in STREAMING_NAMES and name not in names:
+            names.add(name)
+            suggestions.append(AppEntry(package, name, color, False, False))
+    return sorted(suggestions, key=lambda entry: entry.name.lower())
 
 
 def search(entries: list[AppEntry], query: str) -> list[AppEntry]:

@@ -7,7 +7,7 @@ Aplicativo pessoal de estudo para Windows: controlar um Fire TV Stick na rede lo
 - Criar ambiente: `py -m venv .venv`.
 - Instalar: `.\.venv\Scripts\python.exe -m pip install -e ".[dev]"`.
 - Executar: `.\.venv\Scripts\python.exe -m firetv.main`.
-- A versão desktop passou em 324 testes no Windows com Python 3.14.5 e PySide6 6.12.0; execute os testes ao alterar o código. Os testes de instância precisam de permissão para criar canais locais do Windows.
+- A versão desktop passou em 329 testes no Windows com Python 3.14.5 e PySide6 6.12.0; execute os testes ao alterar o código. Os testes de instância precisam de permissão para criar canais locais do Windows.
 - Testar: `.\.venv\Scripts\python.exe -m pytest -q`.
 - Empacotar no Windows: `.\build_exe.bat`.
 - Uso real exige depuração ADB, autorização na TV e IPv4 acessível na porta 5555.
@@ -30,5 +30,6 @@ Aplicativo pessoal de estudo para Windows: controlar um Fire TV Stick na rede lo
 - Preservar instância única e geometria da janela. O build também gera FireTVDesktopSetup.exe; instalação por usuário, com atalhos e desinstalação que preserva os dados.
 - Início desktop: controle/teclado e resumo em duas colunas, empilhadas em janelas estreitas. Reaproveitar RemoteTab; preservar proteção dos atalhos durante digitação. ConnectionBar usa o fluxo de conexão de SettingsTab.
 - Volume vazio/desconhecido na interface exige diagnóstico antes de habilitar botões. Não tratar sucesso do comando como prova de efeito físico na TV.
+- App atual dentro de TV vetorial; animações curtas, sem loop e paradas quando ocultas. Apps instalados e sugestões separados; sugestões não abrem pacotes inexistentes nem instalam serviços.
 - Consultar os planos como histórico; conferir no código o que já está implementado.
 - Validar com testes pertinentes e informar honestamente o que não foi possível testar.

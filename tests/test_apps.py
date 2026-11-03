@@ -139,9 +139,9 @@ def test_featured_is_known_or_user_installed():
     assert featured == {"com.netflix.ninja": True, "x.y.z": True, "android": False}
 
 
-def test_everything_is_featured_when_the_user_installed_list_is_unknown():
+def test_internal_packages_stay_out_when_the_user_installed_list_is_unknown():
     entries = build_entries(["x.y.z", "android"], AppConfig())
-    assert all(e.featured for e in entries)
+    assert {e.package: e.featured for e in entries} == {"x.y.z": True, "android": False}
 
 
 def test_list_apps_marks_system_packages_as_not_featured(conn):

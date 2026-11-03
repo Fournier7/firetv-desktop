@@ -25,6 +25,7 @@ from firetv.ui.theme import STYLESHEET
 
 def main() -> None:
     app = QApplication([])
+    app.setQuitOnLastWindowClosed(False)
     app.setStyleSheet(STYLESHEET)
     output = ROOT / "docs/screenshots"
     output.mkdir(parents=True, exist_ok=True)
@@ -37,6 +38,7 @@ def main() -> None:
             ("home.png", 1000, True, "home"),
             ("remote.png", 1000, True, "remote"),
             ("apps.png", 1000, True, "apps"),
+            ("apps-discover.png", 1000, True, "discover"),
             ("activity.png", 1000, True, "activity"),
             ("settings.png", 1000, True, "settings"),
         ]:
@@ -60,10 +62,13 @@ def main() -> None:
                     log.record(package, now)
             panel = Panel(session, cfg, log)
             panel.resize(width, 820)
-            panel.show_tab(tab)
+            panel.show_tab("apps" if tab == "discover" else tab)
             panel.show()
-            panel.tab_buttons[tab].setFocus()
-            QTest.qWait(200)
+            panel.tab_buttons["apps" if tab == "discover" else tab].setFocus()
+            QTest.qWait(300)
+            if tab == "discover":
+                panel.apps_tab.mode_tabs.setCurrentIndex(1)
+                QTest.qWait(100)
             if not panel.grab().save(str(output / filename)):
                 raise RuntimeError(f"Não foi possível salvar {filename}")
             panel.close()

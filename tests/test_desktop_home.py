@@ -33,7 +33,7 @@ def test_home_uses_two_columns_and_stacks_when_narrow(qtbot, tmp_path):
     assert home.quick_remote.geometry().right() < home.summary.geometry().left()
     panel.resize(420, 760)
     qtbot.wait(50)
-    assert home.quick_remote.geometry().bottom() < home.summary.geometry().top()
+    assert home.summary.geometry().bottom() < home.quick_remote.geometry().top()
 
 
 def test_home_remote_sends_command_once_and_does_not_intercept_typing(qtbot, tmp_path):

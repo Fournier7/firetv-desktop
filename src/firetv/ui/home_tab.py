@@ -74,8 +74,8 @@ class HomeTab(QWidget):
         self._columns = QBoxLayout(QBoxLayout.TopToBottom, self)
         self._columns.setContentsMargins(0, 0, 0, 0)
         self._columns.setSpacing(20)
-        self._columns.addWidget(self.quick_remote, 1)
         self._columns.addWidget(self.summary, 1)
+        self._columns.addWidget(self.quick_remote, 1)
 
         self.timer = QTimer(self)
         self.timer.setInterval(POLL_INTERVAL_SECONDS * 1000)
@@ -88,6 +88,12 @@ class HomeTab(QWidget):
     def set_wide_layout(self, wide: bool) -> None:
         wide = wide and self._desktop_mode
         self._columns.setDirection(QBoxLayout.LeftToRight if wide else QBoxLayout.TopToBottom)
+        first, second = (self.quick_remote, self.summary) if wide else (self.summary, self.quick_remote)
+        if self._columns.itemAt(0).widget() is not first:
+            self._columns.removeWidget(first)
+            self._columns.removeWidget(second)
+            self._columns.addWidget(first, 1)
+            self._columns.addWidget(second, 1)
         self.quick_remote.dpad.set_diameter(240 if wide else 200)
         columns = 4 if wide else 2
         if columns != self._favorite_columns:
@@ -152,7 +158,7 @@ class HomeTab(QWidget):
         by_package = {e.package: e for e in entries}
         shown = [by_package[p] for p in self._cfg.favorites[:MAX_FAVORITES] if p in by_package]
         for index, entry in enumerate(shown):
-            tile = AppTile(entry, show_star=False, compact=True)
+            tile = AppTile(entry, show_star=False, compact=True, animated=True)
             tile.setMinimumWidth(64)
             tile.setMaximumWidth(16777215)
             tile.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)

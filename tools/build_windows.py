@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import argparse
 import hashlib
 from pathlib import Path
 import subprocess
@@ -9,9 +10,13 @@ import sys
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output-dir", type=Path, default=Path("dist"))
+    args = parser.parse_args()
     if sys.platform != "win32":
         raise SystemExit("O executável Windows deve ser gerado no Windows.")
     root = Path(__file__).resolve().parents[1]
+    destination = (root / args.output_dir).resolve()
     windows = Path(os.environ["SystemRoot"])
     python = Path(sys.base_prefix)
     env = os.environ.copy()
@@ -26,9 +31,10 @@ def main() -> None:
         sys.executable, "-m", "PyInstaller", "--clean", "--noconfirm",
         "--onefile", "--noconsole", "--name", "FireTVDesktop",
         "--icon", "build/firetv.ico", "--paths", "src", "app.py",
+        "--distpath", str(destination),
     ], cwd=root, env=env, check=True)
     digest = hashlib.sha256()
-    payload = root / "dist/FireTVDesktop.exe"
+    payload = destination / "FireTVDesktop.exe"
     with payload.open("rb") as stream:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(block)
@@ -40,6 +46,7 @@ def main() -> None:
         "--icon", "build/firetv.ico", "--paths", "src",
         "--add-data", str(payload) + os.pathsep + "payload",
         "--add-data", str(digest_path) + os.pathsep + "payload", "installer.py",
+        "--distpath", str(destination),
     ], cwd=root, env=env, check=True)
 
 

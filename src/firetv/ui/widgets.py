@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import math
 
-from PySide6.QtCore import QPoint, QPointF, QRectF, Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen, QPolygonF
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtCore import QEasingCurve, QPoint, QPointF, QPropertyAnimation, QRectF, Qt, Signal
+from PySide6.QtGui import QBrush, QColor, QFont, QLinearGradient, QPainter, QPen, QPolygonF
+from PySide6.QtWidgets import QFrame, QGraphicsOpacityEffect, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from firetv.config import AppConfig
 from firetv.connection import ConnectionLostError
@@ -207,25 +207,101 @@ class AudioCard(Card):
         )
 
 
-class TvCard(Card):
-    """Cartão da TV: mostra o app em execução, pintado com a cor do app."""
+class _TvScreen(QWidget):
+    """TV vetorial: tela, moldura, indicador e base; sem captura de vídeo."""
 
     def __init__(self) -> None:
         super().__init__()
+        self.accent = theme.DEFAULT_ACCENT
+        self.setMinimumHeight(196)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        bezel = QRectF(2, 2, self.width() - 4, self.height() - 28)
+        color = QColor(self.accent)
+        painter.setPen(QPen(QColor("#3A475E"), 1.4))
+        painter.setBrush(QColor("#080C13"))
+        painter.drawRoundedRect(bezel, 14, 14)
+        glass = bezel.adjusted(7, 7, -7, -9)
+        gradient = QLinearGradient(glass.topLeft(), glass.bottomRight())
+        gradient.setColorAt(0, QColor(theme.BG))
+        tint = QColor(color)
+        tint.setAlpha(55)
+        gradient.setColorAt(1, tint)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(gradient)
+        painter.drawRoundedRect(glass, 9, 9)
+        painter.setBrush(QColor("#344258"))
+        painter.drawRoundedRect(QRectF(self.width() / 2 - 10, self.height() - 27, 20, 17), 2, 2)
+        painter.drawRoundedRect(QRectF(self.width() / 2 - 36, self.height() - 11, 72, 5), 2, 2)
+        painter.setBrush(color)
+        painter.drawEllipse(QPointF(self.width() / 2, bezel.bottom() - 4), 2, 2)
+
+
+class TvCard(Card):
+    """App atual dentro de uma TV ilustrada, com transição somente ao trocar."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._last_app = "__initial__"
+        self._last_accent = ""
+        self.screen = _TvScreen()
         self.caption_label = QLabel("AGORA NA TELA")
+        self.mark_label = QLabel("TV")
+        self.mark_label.setFixedSize(38, 38)
+        self.mark_label.setAlignment(Qt.AlignCenter)
         self.name_label = QLabel(NO_APP)
+        self.name_label.setObjectName("tvApp")
         self.name_label.setStyleSheet("font-size: 22px; font-weight: bold;")
         self.name_label.setWordWrap(True)
-        self.setMinimumHeight(140)
-        self.body.addWidget(self.caption_label)
-        self.body.addWidget(self.name_label)
-        self.body.addStretch(1)
+        self.name_label.setAlignment(Qt.AlignCenter)
+        screen_layout = QVBoxLayout(self.screen)
+        screen_layout.setContentsMargins(20, 14, 20, 38)
+        screen_layout.setSpacing(7)
+        screen_layout.addWidget(self.caption_label)
+        screen_layout.addStretch(1)
+        screen_layout.addWidget(self.mark_label, 0, Qt.AlignCenter)
+        screen_layout.addWidget(self.name_label)
+        screen_layout.addStretch(1)
+        self.body.setContentsMargins(0, 0, 0, 0)
+        self.body.setSpacing(0)
+        self.body.addWidget(self.screen)
+        self._opacity = QGraphicsOpacityEffect(self.screen)
+        self._opacity.setOpacity(1.0)
+        self.screen.setGraphicsEffect(self._opacity)
+        self.transition = QPropertyAnimation(self._opacity, b"opacity", self)
+        self.transition.setDuration(180)
+        self.transition.setEasingCurve(QEasingCurve.OutCubic)
         self.set_app(None, theme.DEFAULT_ACCENT)
 
     def set_app(self, name: str | None, accent: str) -> None:
+        if name == self._last_app and accent == self._last_accent:
+            return
+        self._last_app, self._last_accent = name, accent
         self.name_label.setText(name or NO_APP)
+        self.mark_label.setText("".join(word[0] for word in name.split()[:2]).upper() if name else "TV")
+        self.mark_label.setStyleSheet(
+            f"background: {accent if name else theme.PANEL_BORDER}; color: white; border-radius: 10px;"
+            "font-size: 16px; font-weight: bold;"
+        )
         self.caption_label.setStyleSheet(f"color: {accent}; font-size: 11px; font-weight: bold;")
         self.setStyleSheet(
-            f"QFrame#card {{ background: {theme.tint(accent, 0.16)};"
-            f" border: 1px solid {theme.tint(accent, 0.45)}; border-radius: 14px; }}"
+            "QFrame#card { background: transparent; border: 0; }"
+            f"QLabel#tvApp {{ background: {theme.tint(accent, 0.16)}; border-radius: 6px; padding: 3px; }}"
         )
+        self.screen.accent = accent
+        self.screen.update()
+        self.transition.stop()
+        if self.isVisible():
+            self.transition.setStartValue(0.25)
+            self.transition.setEndValue(1.0)
+            self.transition.start()
+        else:
+            self._opacity.setOpacity(1.0)
+
+    def hideEvent(self, event) -> None:
+        self.transition.stop()
+        self._opacity.setOpacity(1.0)
+        super().hideEvent(event)
