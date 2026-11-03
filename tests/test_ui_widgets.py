@@ -83,9 +83,9 @@ def test_dpad_set_accent_does_not_break(qtbot):
     dpad.grab()  # força o desenho
 
 
-def test_audio_card_default_method_is_keyevent(qtbot, env):
+def test_audio_card_confirmed_keyevent_sends_keys(qtbot, env):
     conn, session = env
-    card = make_audio(qtbot, session, AppConfig())
+    card = make_audio(qtbot, session, AppConfig(volume_method="keyevent"))
     card.vol_up_button.click()
     qtbot.waitUntil(lambda: "input keyevent 24" in conn.commands, timeout=3000)
     card.vol_down_button.click()
@@ -121,16 +121,19 @@ def test_audio_card_refresh_picks_up_new_method(qtbot, env):
     qtbot.waitUntil(lambda: "input keyboard keyevent 24" in conn.commands, timeout=3000)
 
 
-def test_audio_card_unknown_method_in_config_falls_back_to_keyevent(qtbot, env):
+@pytest.mark.parametrize("method", ["", "inventado"])
+def test_audio_card_unconfirmed_method_requires_configuration(qtbot, env, method):
     conn, session = env
-    card = make_audio(qtbot, session, AppConfig(volume_method="inventado"))
+    card = make_audio(qtbot, session, AppConfig(volume_method=method))
     card.vol_up_button.click()
-    qtbot.waitUntil(lambda: "input keyevent 24" in conn.commands, timeout=3000)
+    assert not card.vol_up_button.isEnabled()
+    assert "não configurado" in card.availability_label.text()
+    assert conn.commands == []
 
 
 def test_audio_card_failure_shows_notice_and_success_clears_it(qtbot, env):
     conn, session = env
-    card = make_audio(qtbot, session, AppConfig())
+    card = make_audio(qtbot, session, AppConfig(volume_method="keyevent"))
     conn.responses["input keyevent 24"] = "Error: not supported"
     card.vol_up_button.click()
     qtbot.waitUntil(lambda: card.notice_label.text() == MSG_VOLUME, timeout=3000)
@@ -141,9 +144,11 @@ def test_audio_card_failure_shows_notice_and_success_clears_it(qtbot, env):
 def test_audio_card_lost_connection_notice(qtbot):
     conn = FakeConnection()
     session = Session(lambda: conn, sleep=lambda s: None)
-    card = make_audio(qtbot, session, AppConfig())
+    card = make_audio(qtbot, session, AppConfig(volume_method="keyevent"))
     card.vol_up_button.click()
-    qtbot.waitUntil(lambda: card.notice_label.text() == MSG_LOST, timeout=3000)
+    assert not card.vol_up_button.isEnabled()
+    assert "Conecte a TV" in card.availability_label.text()
+    assert conn.commands == []
 
 
 def test_tv_card_texts(qtbot):

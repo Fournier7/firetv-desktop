@@ -4,6 +4,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import os
+import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -15,6 +16,7 @@ class AppConfig:
     hidden: list[str] = field(default_factory=list)
     tv_name: str = "Fire TV"
     volume_method: str = ""
+    window_geometry: str = ""
 
 
 def config_dir() -> Path:
@@ -39,6 +41,7 @@ def load_config(path: Path | None = None) -> AppConfig:
             hidden=list(data.get("hidden", [])),
             tv_name=str(data.get("tv_name") or "").strip() or "Fire TV",
             volume_method=str(data.get("volume_method") or ""),
+            window_geometry=str(data.get("window_geometry") or ""),
         )
     except (ValueError, AttributeError, TypeError):
         target.replace(target.with_name(target.name + ".bak"))
@@ -48,7 +51,20 @@ def load_config(path: Path | None = None) -> AppConfig:
 def save_config(cfg: AppConfig, path: Path | None = None) -> None:
     target = _config_path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps(asdict(cfg), ensure_ascii=False, indent=2), encoding="utf-8")
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=target.parent,
+            prefix=target.name + ".", suffix=".tmp", delete=False,
+        ) as stream:
+            temporary = Path(stream.name)
+            json.dump(asdict(cfg), stream, ensure_ascii=False, indent=2)
+            stream.flush()
+            os.fsync(stream.fileno())
+        temporary.replace(target)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def validate_host(value: str) -> str:

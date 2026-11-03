@@ -196,6 +196,8 @@ class AppsTab(QWidget):
         return found
 
     def set_current_app(self, package: str | None) -> None:
+        if package == self._current:
+            return
         self._current = package
         for tile in self.tiles():
             tile.set_on_screen(tile.entry.package == package)

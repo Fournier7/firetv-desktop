@@ -1,6 +1,6 @@
 # Fire TV Desktop
 
-**Controle o seu Fire TV Stick pelo PC.** App de bandeja para Windows, feito em Python com PySide6, que fala com o Stick por ADB na rede local: controle remoto, teclado, grade de apps, favoritos e histórico de uso.
+**Controle o seu Fire TV Stick pelo PC.** Aplicativo desktop para Windows, feito em Python com PySide6, que fala com o Stick por ADB na rede local: controle remoto, teclado, grade de apps, favoritos e histórico de uso.
 
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)
 ![PySide6](https://img.shields.io/badge/UI-PySide6-41CD52)
@@ -8,6 +8,10 @@
 ![MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-green)
 
 > **Projeto pessoal de estudo e prática de programação**, feito para uso próprio e **sem qualquer vínculo com a Amazon**. Veja o [aviso](#aviso).
+
+![Tela inicial desktop com controle, aplicativos e volume](docs/screenshots/desktop.png)
+
+Capturas da versão atual, com dados fictícios:
 
 <p align="center">
   <img src="docs/screenshots/home.png" width="230" alt="Tela Início">
@@ -21,12 +25,28 @@
 
 ## Por que existe
 
-Este projeto nasceu como **estudo e treinamento prático de programação**. Eu queria praticar Python, interface gráfica (PySide6), comunicação em rede (ADB), testes automatizados e empacotamento, e escolhi um problema real do meu dia a dia: controlar a minha Fire TV pelo computador, sem pegar o controle remoto nem o celular. A ideia é a de um painel na bandeja do Windows, que abre com um clique no ícone.
+Este projeto nasceu como **estudo e treinamento prático de programação**. Eu queria praticar Python, interface gráfica (PySide6), comunicação em rede (ADB), testes automatizados e empacotamento, e escolhi um problema real do meu dia a dia: controlar a minha Fire TV pelo computador, sem pegar o controle remoto nem o celular. A versão inicial era um painel na bandeja. Agora a abertura padrão é uma janela desktop, para ser mais fácil encontrar e reabrir.
+
+## Janela desktop
+
+A abertura padrão mostra uma janela normal: aparece na barra de tarefas, permite minimizar, maximizar e redimensionar, e permanece aberta ao clicar em outro aplicativo. Fechar pelo X salva os dados e encerra o programa. O build cria um atalho na Área de Trabalho; depois de abrir, você também pode fixar o app na barra de tarefas.
+
+Ao abrir o atalho novamente, a janela existente é trazida para frente. O tamanho, a posição e o estado maximizado são lembrados ao fechar. Se o monitor anterior não estiver disponível, a janela retorna a uma tela acessível.
+
+A tela Início reúne controle remoto e teclado à esquerda, com aplicativo atual, favoritos e volume à direita. Aumente ou maximize a janela para ver as duas colunas; em janelas estreitas, os painéis ficam empilhados e podem ser rolados. A faixa de conexão mostra a TV, orienta sobre falhas e oferece Reconectar sem sair da tela.
+
+Os botões de volume começam desativados até o diagnóstico confirmar um método compatível. Clique em Configurar volume e confirme na TV se o comando funcionou.
+
+O modo antigo continua opcional: execute `FireTVDesktop.exe --tray` ou `python -m firetv.main --tray`. Nesse modo, use o menu da bandeja para sair. Os planos em `docs/planos` registram a evolução da interface.
+
+Outras capturas: [janela estreita](docs/screenshots/desktop-narrow.png), [sem conexão](docs/screenshots/desktop-disconnected.png) e [instalador](docs/screenshots/installer.png). Para recriá-las sem acessar uma TV, rode `python tools/preview_interface.py` no ambiente de desenvolvimento.
+
+Para recriar o atalho sem recompilar: `powershell -NoProfile -ExecutionPolicy Bypass -File .\criar_atalho.ps1`. O executável precisa continuar no local para o qual o atalho aponta.
 
 ## Funcionalidades
 
-- **Painel na bandeja do sistema:** abre com um clique no ícone, fecha ao clicar fora, e conecta sozinho ao Stick ao iniciar.
-- **Início:** o app em execução na TV, botões de volume e os favoritos. A cor de destaque do painel muda conforme o app (vermelho no YouTube e na Netflix, azul no Prime Video).
+- **Janela desktop:** abre ao executar, fica na barra de tarefas e conecta ao IP salvo. O modo de bandeja é opcional com `--tray`.
+- **Início:** controle remoto, envio de texto, app em execução, favoritos e configuração de volume numa tela adaptável. A cor de destaque muda conforme o app em execução.
 - **Controle:** direcional circular, Início, Voltar, Menu, retroceder, play/pause e avançar. Atalhos de teclado (setas, Enter e Esc) que não disparam enquanto você digita.
 - **Digitação no PC:** escreva no teclado do computador e envie para o campo de texto aberto na TV.
 - **Apps:** apps famosos (Netflix, Prime Video, YouTube, Disney+, HBO Max, Spotify, Apple TV, Paramount+ e outros) e os que você instalou, com busca, favoritos e opção de esconder. Os pacotes do sistema ficam fora da lista, a menos que você peça para ver todos.
@@ -45,7 +65,9 @@ Este projeto nasceu como **estudo e treinamento prático de programação**. Eu 
 
 ### 2. Obter o app
 
-- **Mais fácil (Windows):** instale o Python 3.10 ou mais novo (marque *Add python.exe to PATH*) e dê dois cliques em `build_exe.bat`. Ele cria o ambiente, instala as dependências e gera `dist\FireTVDesktop.exe`, um arquivo único.
+- **Instalador:** abra `dist\FireTVDesktopSetup.exe` e clique em Instalar. Feche a versão antiga antes de atualizar. O programa fica em `%LOCALAPPDATA%\Programs\FireTVDesktop`, com atalhos na Área de Trabalho e no menu Iniciar, sem precisar de administrador. Use as configurações de aplicativos instalados do Windows para desinstalar; configurações e histórico são preservados.
+
+- **Gerar pelo código (Windows):** instale o Python 3.10 ou mais novo (marque *Add python.exe to PATH*) e dê dois cliques em `build_exe.bat`. Ele gera o aplicativo `dist\FireTVDesktop.exe` e o instalador `dist\FireTVDesktopSetup.exe`.
 - **Sem instalar Python:** no GitHub, abra a aba **Actions**, escolha **Build Windows** e clique em **Run workflow** (ou envie uma tag `v*`). O workflow roda os testes e deixa o `.exe` para baixar como artefato.
 - **Pelo código:** veja [Desenvolvimento](#desenvolvimento).
 
@@ -103,7 +125,7 @@ docs/planos/      especificação e planos de implementação de cada versão
 python -m venv .venv
 .venv\Scripts\activate          # no Linux/macOS: source .venv/bin/activate
 pip install -e ".[dev]"
-python -m firetv.main           # abre o app
+python -m firetv.main           # abre a janela desktop
 pytest                          # roda os testes
 ```
 
@@ -114,8 +136,12 @@ Para conferir um executável gerado: `start /wait "" dist\FireTVDesktop.exe --se
 
 Com o PC no cabo e o Stick no wifi:
 
-- [ ] o ícone aparece na bandeja e o clique abre e fecha o painel
-- [ ] o painel aparece perto do relógio e some ao clicar fora
+- [ ] o executável abre a janela e ela aparece na barra de tarefas
+- [ ] minimizar, restaurar, maximizar e redimensionar funcionam
+- [ ] fechar salva os dados e encerra o app
+- [ ] o atalho da Área de Trabalho reabre o app
+- [ ] a janela permanece aberta ao clicar fora
+- [ ] opcional: --tray mantém o painel antigo perto do relógio
 - [ ] ao abrir, conecta sozinho ao IP salvo (na primeira vez, abre em Ajustes)
 - [ ] direcionais, OK, Voltar e Início respondem; os atalhos de teclado funcionam e não disparam ao digitar
 - [ ] enviar texto simples e texto com acento (o aviso aparece)

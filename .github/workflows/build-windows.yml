@@ -15,8 +15,10 @@ jobs:
           python-version: "3.12"
       - run: pip install -e ".[dev]"
       - run: pytest -q
-      - run: pyinstaller --noconfirm --onefile --noconsole --name FireTVDesktop --paths src app.py
+      - run: python tools/build_windows.py
       - uses: actions/upload-artifact@v4
         with:
           name: FireTVDesktop
-          path: dist/FireTVDesktop.exe
+          path: |
+            dist/FireTVDesktop.exe
+            dist/FireTVDesktopSetup.exe

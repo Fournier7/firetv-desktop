@@ -30,6 +30,8 @@ class SettingsTab(QWidget):
     connected = Signal(str)  # IP conectado com sucesso
     volume_method_changed = Signal()
     dialog_active = Signal(bool)  # o diálogo de diagnóstico está aberto?
+    connecting_changed = Signal(bool)
+    connection_error = Signal(str)
 
     def __init__(self, session: Session, cfg: AppConfig) -> None:
         super().__init__()
@@ -92,13 +94,17 @@ class SettingsTab(QWidget):
         self.status_label.setText(STATUS_TEXT[state])
 
     def _on_connect_clicked(self) -> None:
+        if not self.connect_button.isEnabled():
+            return
         try:
             host = validate_host(self.host_edit.text())
         except ValueError:
             self.message_label.setText(MSG_INVALID_HOST)
+            self.connection_error.emit(MSG_INVALID_HOST)
             return
         self.message_label.setText("")
         self.connect_button.setEnabled(False)
+        self.connecting_changed.emit(True)
         run_in_background(
             lambda: self._session.connect(host),
             lambda _: self._on_connected(host),
@@ -110,10 +116,18 @@ class SettingsTab(QWidget):
         self._cfg.host = host
         save_config(self._cfg)
         self.connected.emit(host)
+        self.connecting_changed.emit(False)
 
     def _on_connect_error(self, exc: Exception) -> None:
         self.connect_button.setEnabled(True)
+        self.connecting_changed.emit(False)
         if isinstance(exc, AuthRequiredError):
             self.message_label.setText(MSG_AUTH)
         else:
             self.message_label.setText(MSG_FAILED)
+        self.connection_error.emit(self.message_label.text())
+
+    def connect_to_host(self, host: str) -> None:
+        if self.connect_button.isEnabled():
+            self.host_edit.setText(host)
+            self._on_connect_clicked()

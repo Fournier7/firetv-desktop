@@ -45,6 +45,14 @@ def test_new_fields_roundtrip(tmp_path):
 def test_new_field_defaults():
     cfg = AppConfig()
     assert cfg.tv_name == "Fire TV" and cfg.volume_method == ""
+    assert cfg.window_geometry == ""
+
+
+def test_window_geometry_roundtrip(tmp_path):
+    path = tmp_path / "config.json"
+    cfg = AppConfig(window_geometry="geometria-salva")
+    save_config(cfg, path)
+    assert load_config(path).window_geometry == cfg.window_geometry
 
 
 def test_old_file_without_new_fields_loads_defaults(tmp_path):
@@ -67,3 +75,20 @@ def test_null_host_becomes_empty_string(tmp_path):
     path.write_text('{"host": null, "volume_method": null}', encoding="utf-8")
     cfg = load_config(path)
     assert cfg.host == "" and cfg.volume_method == ""
+
+
+def test_save_failure_keeps_previous_config_and_cleans_temp_file(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    path = tmp_path / "config.json"
+    save_config(AppConfig(tv_name="Anterior"), path)
+    previous = path.read_bytes()
+
+    def fail_replace(self, target):
+        raise OSError("Falha simulada ao substituir o arquivo")
+
+    monkeypatch.setattr(Path, "replace", fail_replace)
+    with pytest.raises(OSError):
+        save_config(AppConfig(tv_name="Nova"), path)
+    assert path.read_bytes() == previous
+    assert list(tmp_path.iterdir()) == [path]

@@ -1,5 +1,6 @@
 """Ponto de entrada usado pelo empacotamento (PyInstaller)."""
 from firetv.main import main
+import sys
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -55,9 +55,9 @@ def env(tmp_path):
     return conn, session, AppConfig(host="192.168.0.10", tv_name="Sala"), SpyLog(tmp_path / "act.json")
 
 
-def make_panel(qtbot, env, clock=None):
+def make_panel(qtbot, env, clock=None, tray_mode=False):
     _, session, cfg, log = env
-    panel = Panel(session, cfg, log, clock=clock or Clock())
+    panel = Panel(session, cfg, log, clock=clock or Clock(), tray_mode=tray_mode)
     qtbot.addWidget(panel)
     return panel
 
@@ -74,8 +74,75 @@ def test_panel_position_bottom_right_and_clamped():
 def test_panel_window_flags_and_size(qtbot, env):
     panel = make_panel(qtbot, env)
     flags = panel.windowFlags()
-    assert flags & Qt.FramelessWindowHint and flags & Qt.WindowStaysOnTopHint and flags & Qt.Tool
-    assert panel.size() == QSize(380, 560)
+    assert flags & Qt.WindowType_Mask == Qt.Window
+    assert not flags & Qt.FramelessWindowHint
+    assert not flags & Qt.WindowStaysOnTopHint
+    assert flags & Qt.WindowMinimizeButtonHint and flags & Qt.WindowMaximizeButtonHint
+    assert panel.windowTitle() == "Fire TV Desktop"
+    assert not panel.windowIcon().isNull()
+    assert panel.tab_buttons["settings"].text() == "Ajustes"
+    panel.resize(600, 800)
+    assert panel.size() == QSize(600, 800)
+
+
+def test_desktop_window_stays_visible_on_focus_loss(qtbot, env):
+    clock = Clock(100.0)
+    panel = make_panel(qtbot, env, clock)
+    panel.show_panel()
+    clock.now = 105.0
+    panel.hide_on_deactivate()
+    assert panel.isVisible()
+
+
+def test_desktop_window_restores_from_minimized(qtbot, env):
+    panel = make_panel(qtbot, env)
+    panel.show_panel()
+    panel.showMinimized()
+    panel.show_panel()
+    assert panel.isVisible() and not panel.isMinimized()
+
+
+def test_closing_desktop_window_saves_data(qtbot, env):
+    _, _, _, log = env
+    panel = make_panel(qtbot, env)
+    panel.show_panel()
+    panel.close()
+    assert not panel.isVisible()
+    assert log.saves == 1
+
+
+def test_window_size_and_position_are_restored(qtbot, env):
+    panel = make_panel(qtbot, env)
+    panel.show_panel()
+    panel.resize(500, 620)
+    panel.move(60, 70)
+    qtbot.wait(20)
+    expected = panel.geometry()
+    panel.close()
+    assert env[2].window_geometry
+    restored = make_panel(qtbot, env)
+    restored.show_panel()
+    assert restored.geometry() == expected
+
+
+def test_invalid_window_geometry_uses_visible_defaults(qtbot, env):
+    env[2].window_geometry = "nao-e-base64!"
+    panel = make_panel(qtbot, env)
+    panel.show_panel()
+    assert panel.isVisible()
+    assert panel.width() <= panel.screen().availableGeometry().width()
+    assert panel.height() <= panel.screen().availableGeometry().height()
+    assert panel.screen().availableGeometry().contains(panel.geometry().topLeft())
+
+
+def test_window_saved_on_disconnected_monitor_returns_to_visible_screen(qtbot, env):
+    panel = make_panel(qtbot, env)
+    panel.show_panel()
+    panel.move(50000, 50000)
+    panel.close()
+    restored = make_panel(qtbot, env)
+    restored.show_panel()
+    assert restored.screen().availableGeometry().intersects(restored.geometry())
 
 
 def test_header_shows_tv_name_and_updates(qtbot, env):
@@ -169,7 +236,7 @@ def test_disconnect_resets_the_activity_clock(qtbot, env):
 
 def test_hides_on_deactivate(qtbot, env):
     clock = Clock(100.0)
-    panel = make_panel(qtbot, env, clock)
+    panel = make_panel(qtbot, env, clock, tray_mode=True)
     panel.show_panel()
     clock.now = 101.0
     panel.hide_on_deactivate()
@@ -178,7 +245,7 @@ def test_hides_on_deactivate(qtbot, env):
 
 def test_does_not_hide_right_after_show_or_when_suppressed(qtbot, env):
     clock = Clock(100.0)
-    panel = make_panel(qtbot, env, clock)
+    panel = make_panel(qtbot, env, clock, tray_mode=True)
     panel.show_panel()
     clock.now = 100.1
     panel.hide_on_deactivate()
@@ -267,7 +334,7 @@ def test_auto_connect_failure_is_swallowed(qtbot, env):
 
 def test_tray_toggle_shows_and_hides(qtbot, env, monkeypatch, qapp):
     monkeypatch.setattr(QSystemTrayIcon, "isSystemTrayAvailable", staticmethod(lambda: True))
-    panel = make_panel(qtbot, env)
+    panel = make_panel(qtbot, env, tray_mode=True)
     tray = TrayController(qapp, panel)
     assert not panel.isVisible()
     tray.toggle()
@@ -279,7 +346,7 @@ def test_tray_toggle_shows_and_hides(qtbot, env, monkeypatch, qapp):
 
 def test_tray_left_click_toggles_but_other_clicks_do_not(qtbot, env, monkeypatch, qapp):
     monkeypatch.setattr(QSystemTrayIcon, "isSystemTrayAvailable", staticmethod(lambda: True))
-    panel = make_panel(qtbot, env)
+    panel = make_panel(qtbot, env, tray_mode=True)
     tray = TrayController(qapp, panel)
     tray._on_activated(QSystemTrayIcon.Context)
     assert not panel.isVisible()
@@ -290,7 +357,7 @@ def test_tray_left_click_toggles_but_other_clicks_do_not(qtbot, env, monkeypatch
 
 def test_without_system_tray_the_panel_opens_as_a_normal_window(qtbot, env, monkeypatch, qapp):
     monkeypatch.setattr(QSystemTrayIcon, "isSystemTrayAvailable", staticmethod(lambda: False))
-    panel = make_panel(qtbot, env)
+    panel = make_panel(qtbot, env, tray_mode=True)
     TrayController(qapp, panel)
     assert panel.isVisible()
 
@@ -298,7 +365,7 @@ def test_without_system_tray_the_panel_opens_as_a_normal_window(qtbot, env, monk
 def test_tray_quit_saves_and_quits(qtbot, env, monkeypatch, qapp):
     monkeypatch.setattr(QSystemTrayIcon, "isSystemTrayAvailable", staticmethod(lambda: True))
     _, _, _, log = env
-    panel = make_panel(qtbot, env)
+    panel = make_panel(qtbot, env, tray_mode=True)
     tray = TrayController(qapp, panel)
     quit_calls = []
     monkeypatch.setattr(qapp, "quit", lambda: quit_calls.append(1))
@@ -331,7 +398,7 @@ def test_real_deactivation_event_hides_the_panel(qtbot, env, qapp):
     from PySide6.QtCore import QEvent
 
     clock = Clock(100.0)
-    panel = make_panel(qtbot, env, clock)
+    panel = make_panel(qtbot, env, clock, tray_mode=True)
     panel.show_panel()
     clock.now = 101.0
     qapp.sendEvent(panel, QEvent(QEvent.ActivationChange))
@@ -344,7 +411,7 @@ def test_clicking_the_tray_icon_while_open_closes_instead_of_reopening(qtbot, en
     bandeja: sem tratamento, o painel reabriria no mesmo instante."""
     monkeypatch.setattr(QSystemTrayIcon, "isSystemTrayAvailable", staticmethod(lambda: True))
     clock = Clock(100.0)
-    panel = make_panel(qtbot, env, clock)
+    panel = make_panel(qtbot, env, clock, tray_mode=True)
     tray = TrayController(qapp, panel)
     panel.show_panel()
     clock.now = 101.0

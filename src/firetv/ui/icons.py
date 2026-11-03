@@ -1,6 +1,8 @@
 """Ícones SVG embutidos no código (o .exe continua sendo um arquivo só)."""
 from __future__ import annotations
 
+from functools import lru_cache
+
 from PySide6.QtCore import QByteArray, Qt
 from PySide6.QtGui import QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
@@ -35,6 +37,11 @@ ICON_NAMES = tuple(_BODIES)
 
 
 def icon(name: str, color: str = "#E8E8EA") -> QIcon:
+    return QIcon(_render_icon(name, color))
+
+
+@lru_cache(maxsize=128)
+def _render_icon(name: str, color: str) -> QIcon:
     body = _BODIES[name]  # nome desconhecido levanta KeyError
     fill = color if name == "star_filled" else "none"
     svg = (

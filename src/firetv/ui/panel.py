@@ -1,10 +1,11 @@
-"""Painel na bandeja do sistema: janela sem borda com cabeçalho, abas e rodapé."""
+"""Janela desktop, com modo de painel de bandeja opcional."""
 from __future__ import annotations
 
 import time
+import base64
 from typing import Callable
 
-from PySide6.QtCore import QEvent, QPoint, QRect, QRectF, QSize, Qt
+from PySide6.QtCore import QByteArray, QEvent, QPoint, QRect, QRectF, QSize, Qt
 from PySide6.QtGui import QColor, QGuiApplication, QPainter
 from PySide6.QtWidgets import (
     QApplication,
@@ -26,6 +27,7 @@ from firetv.config import AppConfig, save_config
 from firetv.session import ConnectionState, Session
 from firetv.ui import theme
 from firetv.ui.activity_tab import ActivityTab
+from firetv.ui.connection_bar import ConnectionBar
 from firetv.ui.apps_tab import AppsTab
 from firetv.ui.home_tab import HomeTab
 from firetv.ui.icons import icon
@@ -73,10 +75,21 @@ class Panel(QWidget):
         cfg: AppConfig,
         log: ActivityLog,
         clock: Callable[[], float] = time.monotonic,
+        *,
+        tray_mode: bool = False,
     ) -> None:
-        super().__init__(None, Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
-        self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setFixedSize(PANEL_SIZE)
+        flags = Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint if tray_mode else Qt.Window
+        super().__init__(None, flags)
+        self.tray_mode = tray_mode
+        self.setWindowTitle("Fire TV Desktop")
+        self.setWindowIcon(icon("remote", theme.DEFAULT_ACCENT))
+        if tray_mode:
+            self.setAttribute(Qt.WA_TranslucentBackground)
+            self.setFixedSize(PANEL_SIZE)
+        else:
+            self.setMinimumSize(380, 480)
+            self.resize(1000, 780)
+        self._positioned = False
         self._session = session
         self._cfg = cfg
         self._log = log
@@ -88,11 +101,13 @@ class Panel(QWidget):
         self.accent_changes = 0
         self.setStyleSheet(build_stylesheet(self.accent))
 
-        self.home_tab = HomeTab(session, cfg)
+        self.home_tab = HomeTab(session, cfg, desktop_mode=not tray_mode)
         self.remote_tab = RemoteTab(session, cfg)
         self.apps_tab = AppsTab(session, cfg)
         self.activity_tab = ActivityTab(log)
         self.settings_tab = SettingsTab(session, cfg)
+        self.connection_bar = ConnectionBar(cfg, session.state)
+        self.connection_bar.setVisible(not tray_mode)
         pages = (self.home_tab, self.remote_tab, self.apps_tab, self.activity_tab, self.settings_tab)
 
         # cabeçalho
@@ -121,6 +136,10 @@ class Panel(QWidget):
             button.setIcon(icon(icon_names[key], theme.MUTED))
             button.setToolTip({"home": "Início", "remote": "Controle", "apps": "Apps",
                                "activity": "Atividade", "settings": "Ajustes"}[key])
+            button.setAccessibleName(button.toolTip())
+            if not tray_mode:
+                button.setText(button.toolTip())
+                button.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
             button.clicked.connect(lambda _=False, k=key: self.show_tab(k))
             group.addButton(button)
             self.tab_buttons[key] = button
@@ -139,15 +158,31 @@ class Panel(QWidget):
         footer.addWidget(self.host_label)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(MARGIN, MARGIN, MARGIN, MARGIN)
+        layout.setContentsMargins(*((12, 12, 12, 12) if tray_mode else (24, 20, 24, 16)))
+        layout.setSpacing(16 if not tray_mode else 8)
         layout.addLayout(header)
         layout.addLayout(tabs_row)
+        layout.addWidget(self.connection_bar)
         layout.addWidget(self.stack, 1)
-        layout.addLayout(footer)
+        if tray_mode:
+            layout.addLayout(footer)
+        if not tray_mode:
+            for label in (self.status_dot, self.status_label, self.host_label):
+                label.setParent(self)
+                label.hide()
 
         self._show_state(session.state)
         self.show_tab("home")
         self._wire(session)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if hasattr(self, "home_tab"):
+            wide = not self.tray_mode and self.width() >= 860
+            self.home_tab.set_wide_layout(wide)
+            if not self.tray_mode:
+                for button in self.tab_buttons.values():
+                    button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon if wide else Qt.ToolButtonTextUnderIcon)
 
     @staticmethod
     def _scrollable(page: QWidget) -> QScrollArea:
@@ -169,9 +204,31 @@ class Panel(QWidget):
         self.home_tab.see_all_requested.connect(lambda: self.show_tab("apps"))
         self.apps_tab.favorites_changed.connect(self.home_tab.refresh_favorites)
         self.settings_tab.name_changed.connect(self.name_label.setText)
+        self.settings_tab.name_changed.connect(lambda _: self.connection_bar.refresh())
         self.settings_tab.connected.connect(self.host_label.setText)
         self.settings_tab.volume_method_changed.connect(self._refresh_audio_cards)
         self.settings_tab.dialog_active.connect(self._set_suppress_hide)
+        get_bridge(session).state_changed.connect(self.connection_bar.set_state)
+        self.connection_bar.action_requested.connect(self.reconnect)
+        self.settings_tab.connecting_changed.connect(self.connection_bar.set_busy)
+        self.settings_tab.connection_error.connect(self.connection_bar.show_error)
+        self.settings_tab.connected.connect(lambda _: self.connection_bar.refresh())
+        self.home_tab.configure_volume_requested.connect(self.open_volume_diagnostic)
+        self.remote_tab.audio_card.configure_requested.connect(self.open_volume_diagnostic)
+
+    def reconnect(self) -> None:
+        if self._cfg.host:
+            self.settings_tab.connect_to_host(self._cfg.host)
+        else:
+            self.show_tab("settings")
+            self.settings_tab.host_edit.setFocus()
+
+    def open_volume_diagnostic(self) -> None:
+        if self._session.state is ConnectionState.CONNECTED:
+            self.settings_tab._open_diagnostic()
+        else:
+            self.show_tab("settings")
+            self.settings_tab.message_label.setText("Conecte a TV antes de configurar o volume.")
 
     def _refresh_audio_cards(self) -> None:
         self.home_tab.audio_card.refresh()
@@ -214,20 +271,43 @@ class Panel(QWidget):
         self.accent_changes += 1
         self.setStyleSheet(build_stylesheet(color))
         self.remote_tab.dpad.set_accent(color)
+        self.home_tab.quick_remote.dpad.set_accent(color)
         self._paint_tab_icons()
 
     # --- mostrar e esconder ---
     def show_panel(self) -> None:
-        screen = QGuiApplication.primaryScreen()
-        avail = screen.availableGeometry() if screen is not None else QRect(0, 0, 1280, 720)
-        self.move(panel_position(avail, self.size()))
+        if not self.tray_mode and not self._positioned and self._cfg.window_geometry:
+            try:
+                geometry = base64.b64decode(self._cfg.window_geometry, validate=True)
+                self._positioned = self.restoreGeometry(QByteArray(geometry))
+            except ValueError:
+                pass
+        if self.tray_mode or not self._positioned:
+            screen = self.screen() or QGuiApplication.primaryScreen()
+            avail = screen.availableGeometry() if screen is not None else QRect(0, 0, 1280, 720)
+            if self.tray_mode:
+                self.move(panel_position(avail, self.size()))
+            else:
+                self.resize(
+                    min(self.width(), max(self.minimumWidth(), avail.width() - 32)),
+                    min(self.height(), max(self.minimumHeight(), avail.height() - 48)),
+                )
+                self.move(QPoint(
+                    max(avail.left(), avail.center().x() - self.width() // 2),
+                    max(avail.top(), avail.center().y() - self.height() // 2),
+                ))
+            self._positioned = True
         self._shown_at = self._clock()
-        self.show()
+        if self.isMinimized():
+            self.setWindowState(self.windowState() & ~Qt.WindowMinimized)
+            self.show()
+        else:
+            self.show()
         self.raise_()
         self.activateWindow()
 
     def hide_on_deactivate(self) -> None:
-        if self.suppress_hide or self._clock() - self._shown_at < SHOW_GUARD_SECONDS:
+        if not self.tray_mode or self.suppress_hide or self._clock() - self._shown_at < SHOW_GUARD_SECONDS:
             return
         self._hidden_by_focus_at = self._clock()
         self.hide()
@@ -241,13 +321,24 @@ class Panel(QWidget):
             self.hide_on_deactivate()
 
     def paintEvent(self, event) -> None:
+        if not self.tray_mode:
+            super().paintEvent(event)
+            return
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         painter.setPen(QColor(theme.PANEL_BORDER))
         painter.setBrush(QColor(theme.BG))
         painter.drawRoundedRect(QRectF(0.5, 0.5, self.width() - 1, self.height() - 1), 18, 18)
 
+    def closeEvent(self, event) -> None:
+        if not self.tray_mode:
+            self.home_tab.timer.stop()
+            self.save()
+        super().closeEvent(event)
+
     def save(self) -> None:
+        if not self.tray_mode:
+            self._cfg.window_geometry = bytes(self.saveGeometry().toBase64()).decode("ascii")
         self._log.save()
         save_config(self._cfg)
 

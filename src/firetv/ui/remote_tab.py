@@ -44,7 +44,7 @@ _ICONS = {
 
 
 class RemoteTab(QWidget):
-    def __init__(self, session: Session, cfg: AppConfig) -> None:
+    def __init__(self, session: Session, cfg: AppConfig, *, embedded: bool = False) -> None:
         super().__init__()
         self._session = session
 
@@ -56,6 +56,12 @@ class RemoteTab(QWidget):
             button = QPushButton()
             button.setIcon(icon(_ICONS[key]))
             button.setMinimumHeight(44)
+            labels = {KeyCode.HOME: "Início da TV", KeyCode.BACK: "Voltar", KeyCode.MENU: "Menu",
+                      KeyCode.REWIND: "Retroceder", KeyCode.PLAY_PAUSE: "Reproduzir / pausar",
+                      KeyCode.FAST_FORWARD: "Avançar"}
+            button.setToolTip(labels[key])
+            button.setAccessibleName(labels[key])
+            button.setCursor(Qt.PointingHandCursor)
             button.clicked.connect(lambda _=False, k=key: self._press(k))
             self.buttons[key] = button
             return button
@@ -78,6 +84,10 @@ class RemoteTab(QWidget):
         controls = Card("Controle")
         controls.body.addLayout(pad_row)
         controls.body.addLayout(media_row)
+        shortcuts = QLabel("Use as setas do teclado · Enter para OK · Esc para voltar")
+        shortcuts.setObjectName("help")
+        shortcuts.setWordWrap(True)
+        controls.body.addWidget(shortcuts)
 
         self.text_edit = QLineEdit()
         self.text_edit.setPlaceholderText("Digite no campo aberto na TV")
@@ -96,9 +106,15 @@ class RemoteTab(QWidget):
         self.audio_card = AudioCard(session, cfg)
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(16)
         layout.addWidget(controls)
         layout.addWidget(keyboard)
-        layout.addWidget(self.audio_card)
+        if embedded:
+            self.audio_card.setParent(self)
+            self.audio_card.hide()
+        else:
+            layout.addWidget(self.audio_card)
         layout.addWidget(self.notice_label)
         layout.addStretch(1)
 
